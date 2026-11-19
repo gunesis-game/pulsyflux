@@ -780,6 +780,8 @@ Each card shows:
 - The counts.
 - An activity sparkline.
 
+The activity sparkline is derived client-side from the change in that stream's accepted publish count between successive `GET /v1/streams` polls. Rejected publish counts are not included in the sparkline.
+
 The page refreshes the stream list by polling `GET /v1/streams` every 2 seconds. Newly registered streams then appear without a page reload.
 
 The initial contract has no separate stream-list SSE operation.
@@ -1351,3 +1353,4 @@ The following points are settled by this steering file and are not open decision
 - The trace writer queue defaults to 10000 events and is configurable.
 - There is no public stream-clear or stream-delete operation in the first release.
 - SSE replay uses the standard `Last-Event-ID` HTTP header only. No `?lastEventId=` query parameter or alternative query-based replay mechanism is supported.
+- The stream-monitor activity sparkline is calculated in the browser from the change in each stream's accepted publish count between successive `GET /v1/streams` polls. Rejected publish counts remain separate and are not included in the sparkline.

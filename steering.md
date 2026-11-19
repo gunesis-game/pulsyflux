@@ -1588,7 +1588,7 @@ Settled:
 
 Still to specify:
 
-- Asymmetric cryptographic algorithm.
+- **Settled decision:** Ed25519 is the asymmetric signing algorithm for application authentication. The application's Ed25519 public-key fingerprint is its stable identity.
 - Proof-of-possession protocol.
 - Challenge freshness and replay protection.
 - Credential format.

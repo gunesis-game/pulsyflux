@@ -1642,10 +1642,15 @@ Settled:
 - Approved subscriber–stream authorisations are stored persistently and survive a process restart.
 - A Go client library is optional; authentication must work through documented HTTP and SSE interfaces.
 - SSE replay uses the `Last-Event-ID` HTTP header only. There is no `lastEventId` query parameter.
+- Subscriber IDs must be valid UUIDs supplied by the subscriber application and remain stable across application restarts.
+- Subscriber IDs are normalised to lowercase before storage and comparison. A Subscriber ID is an identifier, not a secret or proof of authorisation.
+- Subscriber Names are required and must not be empty or consist only of whitespace.
+- Subscriber Names are limited to 64 Unicode characters.
+- Leading and trailing whitespace is removed from Subscriber Names before storage and display.
+- Subscriber Names containing control characters are rejected. Other normal Unicode characters, spaces and punctuation are allowed.
+- A Subscriber Name is descriptive only; changing it does not change the subscriber's identity or credentials.
 
 Still to specify:
-
-- Subscriber ID and Name validation rules, including length and character limits.
 - Exact behaviour when a subscriber changes its Name, including how concurrent requests update the displayed value.
 - Browser clients that cannot set an `Authorization` header through native `EventSource` use `fetch()` streaming and an SSE parser; no cookie-based or URL-based credential alternative is supported.
 - Secure storage expectations for the credential at the subscriber.

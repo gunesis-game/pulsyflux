@@ -429,7 +429,7 @@ The workflow is:
 8. Pulsyflux displays the pending subscribers for that stream.
 9. The administrator explicitly approves or rejects the pending subscriber.
 10. If approved, Pulsyflux creates a random bearer credential for that subscriber–stream relationship, stores the approved authorisation persistently, and allows the existing subscription to proceed. Normal SSE message events can then flow.
-11. If not approved, the SSE connection is closed without disclosing the administrator's decision to the subscriber.
+11. If the administrator rejects the request, Pulsyflux sends the terminal SSE event `subscription.closed` with the generic data payload `{"code":"not_authorised"}`, flushes it, and closes the SSE connection. The same event and payload are used when the approval waiting period expires; the subscriber cannot distinguish rejection from timeout.
 
 A pending subscription does not grant access to stream messages.
 
@@ -452,16 +452,14 @@ If approval is granted before the timeout:
 - The subscriber does not need to establish a second subscription merely because approval was pending.
 - The approved subscriber–stream authorisation is stored persistently.
 
-If the waiting period expires without successful approval:
+If the administrator rejects the request or the waiting period expires without approval:
 
-- Pulsyflux closes the SSE connection.
-- The client receives a standard timeout response where applicable.
-- The client is not told whether the administrator explicitly rejected the subscription or simply did not approve it.
-- Pulsyflux records the decision internally.
+- Pulsyflux sends a terminal SSE event named `subscription.closed` with the generic data payload `{"code":"not_authorised"}`.
+- Pulsyflux flushes the terminal event and then closes the SSE connection.
+- Rejection and timeout use exactly the same event name and payload. The subscriber cannot distinguish the two outcomes.
+- Pulsyflux records the actual outcome internally, without exposing the administrator's decision to the subscriber.
 
-The external behaviour must not reveal the administrator's decision.
-
-The timeout and connection-closing behaviour must be implemented consistently with the HTTP and SSE protocol.
+The SSE response has already started with HTTP `200 OK`; Pulsyflux cannot change its status after sending the response headers. Therefore, no HTTP timeout status is sent for an approval timeout or rejection after SSE has started. Errors detected before the SSE response starts use their documented HTTP status and error response.
 
 ### Per-stream pending approval files
 
@@ -924,8 +922,9 @@ These are the usual defects of in-memory brokers. Each one is forbidden:
 - Errors that happen before the SSE stream starts use the documented HTTP status. Never return 200 and then report the error as a frame inside the stream.
 - Request bodies have a configured size limit. Over the limit returns 413.
 - Every error is a generated, documented response type.
-- A pending subscription that is not approved within the allowed waiting period ends with the standard timeout behaviour.
-- The timeout behaviour must not disclose whether the administrator rejected the subscription or simply did not approve it.
+- A pending subscription rejected by the administrator or not approved within the allowed waiting period receives the same terminal SSE event: `subscription.closed` with `{"code":"not_authorised"}`; Pulsyflux flushes the event and closes the connection.
+- Rejection and timeout must not be distinguishable by the subscriber. The actual outcome may be recorded internally.
+- Because the SSE response has already started with HTTP `200 OK`, its status cannot be changed; errors detected before SSE starts use their documented HTTP responses.
 
 ## Tracing
 
@@ -1665,7 +1664,6 @@ Still to specify:
 
 - Browser clients that cannot set an `Authorization` header through native `EventSource` use `fetch()` streaming and an SSE parser; no cookie-based or URL-based credential alternative is supported.
 - Pulsyflux-side credential security: secure generation, storage, one-time delivery, validation and revocation, and preventing credentials from appearing in logs or error responses. Client-side credential storage is outside this project's scope.
-- The exact timeout HTTP response and SSE connection-closing sequence.
 - Existing SSE connection behaviour after revocation.
 - Whether one credential may be used by multiple simultaneous SSE connections.
 - The exact pending approval and persistent subscriber–stream authorisation record formats.

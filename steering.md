@@ -1266,7 +1266,7 @@ To prevent recursive authentication, the core recognises the trusted, startup-pr
 The following details remain open for design discussion:
 
 - The exact internal identity representation and bootstrap/provisioning mechanism beyond the settled startup credential handoff.
-- The Security subscriber's precise event subscriptions and event contracts for authentication and authorisation workflows.
+- The exact event schemas, ordering, delivery guarantees and failure handling for Security's authentication and authorisation event subscriptions.
 - The Tracing subscriber's exact event subscriptions and metadata access boundaries, especially ensuring that message payloads and credentials are never traced.
 - The lifecycle and failure behaviour of either internal subscriber after startup.
 
@@ -1285,6 +1285,7 @@ The following points are settled by this steering file and are not open decision
 - Security is a reserved internal role for the authentication and authorisation subscriber. Its identity and credential are provisioned by Pulsyflux at startup; external clients cannot request or claim it.
 - The Security subscriber uses the same subscription and publishing mechanisms as other subscribers. At startup, the core generates its 256-bit bearer credential, stores only its hash and trusted identity/role/scope record in the shared in-memory credential store, and hands the plaintext credential to the subscriber through a private, one-time in-memory handoff. The subscriber then uses ordinary bearer-token verification, subscription and publishing. The core's generic verifier resolves this pre-seeded Security record locally, so Security is not asked to authorise its own authentication or subscription and no separate messaging path is created.
 - The Security subscriber owns authentication and authorisation policy decisions: it receives relevant workflow events and decides whether Application access is pending, approved, rejected or revoked, and determines the permitted role and stream scope. The core owns foundational credential verification and enforcement: it verifies bearer credentials against the shared in-memory store, enforces the identity, role and scope on operations, manages pending and active SSE connections, enforces timeouts and connection limits, and performs the minimal bootstrap trust check for Security itself. The core does not delegate Security's own authentication or subscription authorisation back to Security.
+- Security subscribes to events for new subscription attempts, reconnection attempts, Application approval and rejection outcomes, credential revocations, and subscriber identity or permission changes. These events provide Security with the workflow context needed for its policy decisions. Event payloads must not contain bearer credentials, credential hashes or message content; event schemas, ordering, delivery guarantees and failure handling remain to be designed.
 - Admin is a global role, not scoped to a stream.
 - Exactly one Admin credential record exists in memory in every running Pulsyflux instance.
 - `PULSYFLUX_ADMIN_TOKEN` is mandatory. If it is missing or empty, Pulsyflux fails startup.

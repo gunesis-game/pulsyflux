@@ -1319,33 +1319,16 @@ Settled:
 
 ### 3. Administrator identity and access
 
-Settled:
-- There is no administrator username or password.
-- The administrator token is supplied through the `PULSYFLUX_ADMIN_TOKEN` environment variable at process startup.
-- The token must contain at least 256 bits of cryptographically secure randomness.
-- A missing or empty token disables administrator functionality; there is no default token or unauthenticated setup path.
-- Administrator authentication is performed by presenting the token to the local administration page. Successful validation establishes an in-memory administrator browser session.
-- The token and browser sessions are never persisted by Pulsyflux. Browser sessions are invalidated when the process exits or restarts.
-- Changing the admin token requires restarting Pulsyflux.
-- The administrator interface must not allow an ordinary local subscriber application to approve, reject or revoke subscriber sessions.
-- Administrator operations are protected by token authentication, the in-memory administrator session and same-origin/CSRF protections.
+Settled as described in Authentication:
+- No administrator username or password.
+- The administrator token is supplied through `PULSYFLUX_ADMIN_TOKEN` at startup and must contain at least 256 bits of cryptographically secure randomness.
+- Missing or empty configuration disables administrator functionality.
+- The administrator presents the token to the local administration page; successful validation establishes an in-memory browser session.
+- Neither the token nor browser sessions are persisted by Pulsyflux. Sessions are invalidated on process exit or restart.
+- Changing the token requires restarting Pulsyflux.
+- Administrator operations are protected by the in-memory session and same-origin/CSRF protections.
 
-No separate administrator credential storage, password reset or account-recovery workflow exists.
-
-### 2. Publisher ownership
-
-Define the remaining ownership responsibilities of a publisher when admission and revocation are controlled by the central authentication component.
-
-### 3. Administrator identity and access
-
-Specify:
-
-- The administrator authentication mechanism.
-- How administrator sessions are maintained and expired.
-- How administrator approval actions are protected.
-- How administrator credentials can be changed or recovered.
-
-The administrator interface must not allow an ordinary local subscriber application to approve subscriptions or revoke credentials.
+There is no separate administrator credential storage, password reset or account-recovery workflow.
 
 ### 4. Pending approval storage
 
@@ -1381,7 +1364,6 @@ The following points are settled by this steering file and are not open decision
 
 - First-release stream and message storage is in-memory and is lost on process exit.
 - All authentication and authorisation state is held in memory only; no authentication files are created or read.
-- Approved subscriber–stream authorisation records are persistent and survive process restarts.
 - Streams use fan-out pub/sub (every subscriber receives every message) with replay, not competing-consumer queue semantics.
 - The stream ID hashes the complete schema document, including annotations such as `title`, `description` and `examples`.
 - The service is loopback-only and is not reachable from the LAN.

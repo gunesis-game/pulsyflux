@@ -695,6 +695,8 @@ When Tracing receives a `stream.gap` for its internal authorisation-event subscr
 
 A recorded authorisation-event gap places Tracing's health status in a degraded state. The degraded warning clears automatically when Tracing successfully reconnects to its internal authorisation-event subscription. The gap diagnostic remains in trace history; reconnection does not recover or fabricate missing events.
 
+If Tracing disconnects again or detects another unrecoverable authorisation-event gap after recovery, its health status becomes degraded immediately when that condition is detected; no additional timeout is required.
+
 Producers hand events to it through a bounded queue, configured by `trace.queueSize` and defaulting to 10000 events.
 
 Tracing never blocks a publish or a delivery.

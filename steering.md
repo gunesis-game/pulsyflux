@@ -792,7 +792,7 @@ Selecting a card opens only that stream's trace from `GET /v1/streams/{streamId}
 
 #### Controls
 
-- Filters by event kind and subscription.
+- Filters by event kind and subscription. When a subscription filter is active, the page shows events belonging to that subscription and retains the corresponding `publish.accepted` events as context when they share the same `runId` and message `seq` with a visible `delivery`. It hides unrelated publishes and deliveries from other subscriptions. Filtering changes presentation only; it does not change trace records or their `traceSeq` order.
 - Pause and resume.
 - Jump to `traceSeq`.
 - On reconnect the page resumes using the standard `Last-Event-ID` HTTP header.
@@ -1354,3 +1354,4 @@ The following points are settled by this steering file and are not open decision
 - There is no public stream-clear or stream-delete operation in the first release.
 - SSE replay uses the standard `Last-Event-ID` HTTP header only. No `?lastEventId=` query parameter or alternative query-based replay mechanism is supported.
 - The stream-monitor activity sparkline is calculated in the browser from the change in each stream's accepted publish count between successive `GET /v1/streams` polls. Rejected publish counts remain separate and are not included in the sparkline.
+- When the stream monitor filters by subscription, it shows events belonging to that subscription and retains corresponding `publish.accepted` context events when they share the same `runId` and message `seq` with a visible `delivery`. It hides unrelated publishes and deliveries from other subscriptions; filtering changes presentation only and preserves the trace records and `traceSeq` order.

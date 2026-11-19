@@ -11,6 +11,7 @@ This file is self-contained. It does not depend on any other repo or steering fi
 - Do not create GitHub Issues or pull requests.
 - The current phase is steering/design only. Do not implement software or scaffold the repository until the user explicitly authorises implementation.
 - Update this steering file as decisions are agreed; do not silently treat proposals as settled decisions. Every rule needed to build the project is written here.
+- Think at both subsystem and whole-system levels. Whenever a mechanism or policy is designed for one subsystem, assess where else it applies and whether a consistent cross-cutting approach is appropriate. Reuse the underlying principles where suitable, but explicitly account for each subsystem's semantics, failure modes and configuration rather than blindly copying local defaults. In particular, review retry and reconnect behaviour across the architecture for backoff, jitter, caps, reset conditions and failure handling.
 
 ## Mission
 
@@ -1288,7 +1289,7 @@ Do not implement until the remaining design details have been discussed and the 
 
 ## Next-session handoff
 
-Continue architecture discussion only; do not implement or scaffold anything. Read this handoff and **Settled decisions** before proposing the next decision. Preserve all settled decisions and update this file after each agreement.
+Continue architecture discussion only; do not implement or scaffold anything. Read this handoff and **Settled decisions** before proposing the next decision. Preserve all settled decisions and update this file after each agreement. For every remaining decision, consider both its local subsystem impact and the wider architectural implications; identify related mechanisms elsewhere that may need consistent treatment.
 
 The Security event-driven authorisation workflow is settled: the core publishes `authorization.requested` and Security publishes `authorization.decided` on one dedicated internal stream using ordinary broker mechanisms. SSE is the transport, not a separate RPC path. Correlation IDs are core-generated cryptographically random UUIDs. Decisions must come from the reserved Security identity, match the pending correlation ID and the original `subscriber_id` and `stream_id`, contain `Approved` or `Denied`, and arrive before the configurable 5-second-default deadline. The first valid decision wins; unanswered requests fail closed; late, duplicate and unknown decisions are discarded and recorded. Security recovery is automatic with exponential backoff; exact Security backoff parameters remain open.
 

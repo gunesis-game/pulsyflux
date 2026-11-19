@@ -365,6 +365,8 @@ Administrator passwords are hashed using Argon2id with a unique cryptographicall
 
 Pulsyflux supports exactly one administrator account. The initial setup creates this single account; there is no multi-administrator account management in the first release.
 
+To reset the administrator username or password, the administrator credential file is deleted manually. On the next startup, because the file is absent, Pulsyflux presents the initial administrator setup flow again. No separate in-application password-change or account-recovery workflow is required.
+
 
 Subscriber applications exist independently of Pulsyflux. Pulsyflux does not create subscriber applications or introduce a subscriber-registration workflow.
 

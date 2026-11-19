@@ -1609,6 +1609,8 @@ Settled:
 - Pulsyflux generates a random bearer credential for each approved subscriber–stream relationship.
 - After approval, Pulsyflux delivers the credential on the existing pending SSE connection using the dedicated `pulsyflux.credential` event, with a JSON `credential` field.
 - A bearer credential is specific to exactly one Subscriber ID and Stream ID.
+- A bearer credential is valid only for the single Stream ID for which it was issued. Pulsyflux must reject it when presented for any other stream, including another stream to which the same Subscriber ID is approved. Credentials are never shared, reused or accepted across streams; each subscriber–stream relationship has its own independent credential.
+- Credential validation must bind the presented credential to the requested Stream ID as well as the Subscriber ID. A valid credential for one relationship must never authenticate a request for another relationship.
 - Each credential is generated from 32 bytes (256 bits) of cryptographically secure randomness using Go's `crypto/rand`.
 - Credentials use unpadded Base64 URL-safe encoding (`base64.RawURLEncoding`).
 - Persistent authorisation records store only the SHA-256 digest of each credential; plaintext credentials are not stored.

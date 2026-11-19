@@ -741,7 +741,7 @@ Its resume cursor is `traceSeq`, supplied exclusively through the `Last-Event-ID
 
 No query-parameter alternative is supported.
 
-The server locates the first retained event after that cursor.
+The server locates the first retained event after that cursor. If the cursor is higher than the newest retained `traceSeq`, it treats the cursor as a valid resume position and waits for future events with higher `traceSeq` values; it does not reject the cursor or emit a `trace.gap` because no missing range has been established.
 
 If rotation has removed events after the cursor, it first sends a `trace.gap` SSE event with `{ fromTraceSeq, toTraceSeq }`, where the range identifies the missing trace sequence numbers, then continues with retained events.
 

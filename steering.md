@@ -353,6 +353,15 @@ The purpose of this design is to make secure messaging straightforward for subsc
 
 Pulsyflux owns the security responsibilities.
 
+### Initial administrator provisioning
+
+On startup, Pulsyflux checks whether the local administrator credential file exists.
+
+If the file does not exist, the local HTML administration page presents the initial setup flow and asks the administrator to provide a username and password. Pulsyflux stores a hashed form of the administrator credentials in the local credential file.
+
+The initial setup flow is available only while the administrator credential file does not exist. On subsequent startups, the administration page presents the normal administrator sign-in flow rather than asking the administrator to create credentials again.
+
+
 Subscriber applications exist independently of Pulsyflux. Pulsyflux does not create subscriber applications or introduce a subscriber-registration workflow.
 
 A subscriber requests access by attempting to subscribe to a stream and supplying its stable Subscriber ID and descriptive Name. Pulsyflux authorises access using the bearer credential associated with the specific subscriber–stream relationship.
@@ -1681,8 +1690,6 @@ Define the remaining ownership responsibilities of a publisher when admission an
 
 Specify:
 
-- How the administrator's credentials are initially provisioned.
-- How administrator credentials are stored securely.
 - The administrator authentication mechanism.
 - How administrator sessions are maintained and expired.
 - How administrator approval actions are protected.

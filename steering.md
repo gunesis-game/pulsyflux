@@ -113,7 +113,7 @@ An HTML administration page is served locally by Pulsyflux.
 
 It allows an administrator to authenticate and select individual streams to review pending subscriber approvals.
 
-The authentication administration interface is part of the existing Pulsyflux service. It is not a separate subscriber or service.
+The authentication administration interface is part of the existing Pulsyflux service. It is not a separate application or service.
 
 ### Test libraries
 
@@ -123,7 +123,7 @@ Standard `testing` package only.
 
 Authentication is built into the Pulsyflux service.
 
-It is not a separate service, process or standalone subscriber module.
+It is not a separate service, process or standalone application module.
 
 Authentication is implemented as another internal subscriber to a stream, following the same general internal subscriber model used by tracing.
 
@@ -166,11 +166,11 @@ Pending subscriber approvals are stored in separate files, one per stream, on lo
 
 Persistent approved subscriber–stream authorisations must also survive a process restart.
 
-Pulsyflux is responsible for generating, validating, storing and revoking subscriber credentials. Subscriber subscribers must not need to implement their own cryptographic authentication modules.
+Pulsyflux is responsible for generating, validating, storing and revoking subscriber credentials. Subscriber applications must not need to implement their own cryptographic authentication modules.
 
-Pulsyflux does not create subscriber subscribers or operate an subscriber-registration process. A subscriber requests access by attempting to subscribe.
+Pulsyflux does not create subscriber applications or operate an application-registration process. A subscriber requests access by attempting to subscribe.
 
-Authentication must work through the documented HTTP and SSE interfaces, independently of the programming language used by a subscriber subscriber.
+Authentication must work through the documented HTTP and SSE interfaces, independently of the programming language used by a subscriber application.
 
 A Go client library may be provided as an optional convenience. It must never be required to use Pulsyflux.
 
@@ -343,21 +343,21 @@ Its tests include the RFC 8785 test vectors.
 
 ## Authentication
 
-Authentication is built into Pulsyflux. It is not a separate service, process, standalone subscriber or independently deployed module.
+Authentication is built into Pulsyflux. It is not a separate service, process, standalone application or independently deployed module.
 
 Authentication is an internal subscriber to a stream, following the same general internal subscriber model used by tracing.
 
 It is responsible for subscriber approval, administrator authentication, credential management, authorisation and revocation.
 
-The purpose of this design is to make secure messaging straightforward for subscriber developers. Applications should not have to implement their own authentication infrastructure or cryptographic security modules.
+The purpose of this design is to make secure messaging straightforward for application developers. Applications should not have to implement their own authentication infrastructure or cryptographic security modules.
 
 Pulsyflux owns the security responsibilities.
 
-Applications exist independently of Pulsyflux. Pulsyflux does not create subscribers or introduce an subscriber-registration workflow.
+Applications exist independently of Pulsyflux. Pulsyflux does not create applications or introduce an application-registration workflow.
 
 Applications request access by attempting to subscribe to a stream. Pulsyflux authorises those requests.
 
-Pulsyflux manages subscriber credential security. It does not issue subscriber credentials as part of creating or registering an subscriber. The precise credential provisioning and delivery arrangement remains to be specified.
+Pulsyflux manages application authentication and credential security. It does not issue application credentials as part of creating or registering an application. The precise credential provisioning and delivery arrangement remains to be specified.
 
 ### Authentication architecture
 
@@ -442,7 +442,7 @@ If approval is granted before the timeout:
 
 - The existing SSE connection proceeds.
 - Normal stream events can flow.
-- The subscriber does not need to establish a second subscription merely because approval was pending.
+- The application does not need to establish a second subscription merely because approval was pending.
 - The approved subscriber–stream authorisation is stored persistently.
 
 If the waiting period expires without successful approval:
@@ -515,11 +515,11 @@ An authenticated administrator can select any stream available to the administra
 
 The administration page is part of `internal/web`, following the same embedded static HTML, CSS and JavaScript approach used by the stream monitor.
 
-It does not require a separate frontend subscriber or build step.
+It does not require a separate frontend application or build step.
 
-Administrator credentials and administrator access must be protected from ordinary subscriber subscribers.
+Administrator credentials and administrator access must be protected from ordinary subscriber applications.
 
-An ordinary subscriber must not be able to approve its own subscription or perform administrator actions.
+An ordinary application must not be able to approve its own subscription or perform administrator actions.
 
 The exact administrator credential provisioning and authentication mechanism remains to be specified.
 
@@ -541,7 +541,7 @@ A credential for one subscriber–stream relationship must not authorise access 
 
 The credential is a secret: possession of it grants the bearer the access associated with that subscriber–stream relationship, subject to revocation. The Subscriber ID and Name are not substitutes for the credential.
 
-Subscriber subscribers must not be required to generate key pairs, sign challenges, or implement their own cryptographic challenge-response infrastructure. Pulsyflux handles credential generation and verification internally.
+Subscriber applications must not be required to generate key pairs, sign challenges, or implement their own cryptographic challenge-response infrastructure. Pulsyflux handles credential generation and verification internally.
 
 The subscriber must be able to retain its credential and present it when reconnecting. The exact credential entropy, encoding, hashing and storage format, initial delivery event, returning-request header format, secure subscriber-side storage expectations, rotation procedure and recovery behaviour remain to be specified.
 
@@ -569,6 +569,7 @@ Approval and authentication are separate concerns:
 - Authentication establishes that a subsequent connection possesses the credential associated with the approved Subscriber ID–Stream ID relationship.
 
 The exact returning-subscription HTTP exchange and failure responses remain to be specified.
+
 ### Authentication and authorisation scope
 
 Authentication and authorisation are stream-scoped.
@@ -597,11 +598,11 @@ The precise remaining implications of publisher ownership are addressed under Op
 
 ### Programming-language independence
 
-Authentication must be usable by subscribers written in any programming language capable of making HTTP requests and consuming SSE.
+Authentication must be usable by applications written in any programming language capable of making HTTP requests and consuming SSE.
 
 The public authentication mechanism must be documented and language-independent.
 
-A subscriber subscriber must not need to be written in Go.
+A subscriber application must not need to be written in Go.
 
 A Go client library may be supplied as an optional convenience, but it must not be required.
 
@@ -619,30 +620,30 @@ The HTTP and SSE contract remains the authoritative interface.
 
 ### Revocation
 
-An administrator must be able to revoke an subscriber's access.
+An administrator must be able to revoke an application's access.
 
-Revocation must affect only the relevant subscriber's access to the relevant stream.
+Revocation must affect only the relevant application's access to the relevant stream.
 
-Other subscribers must continue operating normally.
+Other applications must continue operating normally.
 
 The behaviour of existing SSE connections after revocation must be defined in the authentication protocol.
 
 ### Security boundaries
 
-Pulsyflux must distinguish subscribers and operating-system users.
+Pulsyflux must distinguish applications and operating-system users.
 
 It must not assume that every local process is trusted merely because the service listens on loopback.
 
 The implementation must consider:
 
 - Applications running under different operating-system users.
-- Unauthorised processes attempting to impersonate approved subscribers.
+- Unauthorised processes attempting to impersonate approved applications.
 - Credential theft and reuse.
 - Replay of authentication requests.
 - Local credential disclosure.
 - Credential revocation.
 - Key rotation.
-- Compromised subscriber credentials.
+- Compromised application credentials.
 - Unauthorised access to per-stream pending approval files.
 - Unauthorised administrator access.
 - Attempts to approve subscriptions without administrator authentication.
@@ -704,7 +705,7 @@ An approved subscription proceeds on the existing SSE connection.
 
 If approval is not obtained within the waiting period, Pulsyflux closes the connection and uses the standard timeout behaviour without revealing the administrator's decision.
 
-Applications are identified and authorised independently for each stream.
+Subscribers are identified and authorised independently for each stream.
 
 Previously approved subscriber–stream combinations are automatically authorised on subsequent subscriptions.
 
@@ -1106,7 +1107,7 @@ The page provides an administrator credential form.
 
 The administrator must authenticate before accessing pending subscriber information or performing approval actions.
 
-An ordinary subscriber subscriber must not be able to access administrator functionality.
+An ordinary subscriber application must not be able to access administrator functionality.
 
 #### Stream selection
 
@@ -1136,7 +1137,7 @@ The administrator can move between streams and review their pending subscribers 
 
 Approval or rejection for one stream must not accidentally change the approval state of another stream.
 
-Approval for one stream does not authorise an subscriber to access another stream.
+Approval for one stream does not authorise a subscriber to access another stream
 
 ### Visual design
 
@@ -1159,7 +1160,7 @@ The layout works from laptop to wide screens.
 - Administrator credentials must not be exposed in page scripts, URLs or logs.
 - State-changing administration operations must reject cross-origin requests.
 - The page uses the existing Pulsyflux service and authentication component.
-- It does not introduce a separate authentication subscriber or service.
+- It does not introduce a separate authentication application or service.
 - `/`, `/streams` and the authentication administration page link to each other where appropriate.
 
 ## Docs and "Try it" console
@@ -1352,7 +1353,7 @@ This file defines the tracking rules. Store implementation iteration records in 
 The project is currently in the steering and design phase.
 
 - Work is limited to reading, discussing, refining and updating project documentation and decisions, especially this `steering.md`.
-- Do not implement subscriber code, create the AsyncAPI contract, generate code, scaffold packages, add implementation tests, or begin packaging.
+- Do not implement application code, create the AsyncAPI contract, generate code, scaffold packages, add implementation tests, or begin packaging.
 - Do not begin implementation until the user explicitly says that the steering/design phase is complete and authorises implementation.
 - A proposed design is not an approved decision until it has been agreed with the user and recorded in this file.
 - When an unresolved decision affects architecture or externally visible behaviour, resolve it here before implementation.
@@ -1468,9 +1469,9 @@ The installer:
 - Grants that account write access only to Pulsyflux's required configuration, state and trace directories.
 - Supports install, upgrade and uninstall.
 
-Upgrades stop the service, replace subscriber binaries and service metadata, preserve configuration and state, then restart the service.
+Upgrades stop the service, replace application binaries and service metadata, preserve configuration and state, then restart the service.
 
-Uninstall stops and removes the service and subscriber binaries but preserves configuration and state by default.
+Uninstall stops and removes the service and application binaries but preserves configuration and state by default.
 
 Offer explicit removal only as a separate user choice.
 
@@ -1488,7 +1489,7 @@ Enable the unit for automatic startup at boot and start it after installation.
 
 Configure systemd to restart the service after an unexpected failure, while allowing an intentional stop or package removal to remain stopped.
 
-Package upgrades stop the service, replace subscriber binaries and unit metadata, preserve configuration and state, reload systemd as needed, and restart the service.
+Package upgrades stop the service, replace application binaries and unit metadata, preserve configuration and state, reload systemd as needed, and restart the service.
 
 Ordinary package removal stops and disables the service and removes package-owned binaries and unit files, but preserves configuration and state.
 
@@ -1502,7 +1503,7 @@ Purge/removal of persistent data must be an explicit separate action.
 - The service must not depend on a user's home directory, terminal, interactive session, or current working directory.
 - Installation and service startup must not require internet access.
 - Provide documented service-management commands for status, start, stop and restart using the native operating-system service manager.
-- Do not add a second custom service supervisor or a separate subscriber-level daemon protocol.
+- Do not add a second custom service supervisor or a separate application-level daemon protocol.
 - Package metadata includes the product name, version, architecture, publisher/project URL and license.
 - The license file and release notes are included in the package or linked from its metadata as appropriate.
 - The installers do not bundle Go, require an internet connection, download runtime dependencies, or install a database.
@@ -1553,9 +1554,9 @@ Settled:
 - Each subscriber supplies a human-readable Name to help the administrator recognise it.
 - The Name is descriptive only, is not used for identity or authorisation, and may be changed by the subscriber at any time.
 - The Name is stored separately for each subscriber–stream relationship; the same Subscriber ID may use different Names for different streams.
-- Authentication and authorisation are scoped to the subscriber–stream relationship. There is no subscriber identity, subscriber registration, or subscriber-wide credential.
+- Authentication and authorisation are scoped to the subscriber–stream relationship. There is no application registration or application-wide credential.
 - Approval for one stream does not grant access to another stream.
-- Subscriber subscribers do not generate key pairs and do not need to implement authentication modules or their own cryptographic operations.
+- Subscriber applications do not generate key pairs and do not need to implement authentication modules or their own cryptographic operations.
 - Pulsyflux generates a random bearer credential for each approved subscriber–stream relationship.
 - A bearer credential is specific to exactly one Subscriber ID and Stream ID.
 - Pulsyflux manages credential generation, validation, storage and revocation.
@@ -1605,7 +1606,7 @@ Specify:
 - Whether multiple administrators are supported.
 - How administrator credentials can be changed or recovered.
 
-The administrator interface must not allow an ordinary local subscriber to approve subscriptions or revoke credentials.
+The administrator interface must not allow an ordinary local application to approve subscriptions or revoke credentials.
 
 ### 4. Pending approval storage
 
@@ -1628,7 +1629,7 @@ Persistent subscriber–stream authorisation is settled. Its exact record format
 
 Specify the returning-subscriber authentication mechanism. It must authenticate the subscriber for the requested stream using the credential provisioned for that subscriber–stream relationship, without requiring the administrator approval process again.
 
-The mechanism must not require subscriber subscribers to generate keys or implement their own cryptographic authentication module.
+The mechanism must not require subscriber applications to generate keys or implement their own cryptographic authentication module.
 
 Authorisation must be checked for the specific subscriber–stream relationship. An approval for one stream must never be interpreted as approval for every stream.
 
@@ -1672,7 +1673,7 @@ The following points are settled by this steering file and are not open decision
 - An authenticated administrator can select streams and review their pending subscribers independently.
 - Subsequent subscriptions should not require the complete administrator approval process every time.
 - Pulsyflux manages subscriber authentication and credential security.
-- Subscriber subscribers do not generate key pairs or implement their own authentication or cryptographic operations.
+- Subscriber applications do not generate key pairs or implement their own authentication or cryptographic operations.
 - Pulsyflux generates a random bearer credential for each approved subscriber–stream relationship.
 - Authentication is programming-language independent and uses documented HTTP and SSE interfaces.
 - A Go client library may be provided, but it is optional and never mandatory.

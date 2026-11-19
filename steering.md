@@ -620,30 +620,30 @@ The HTTP and SSE contract remains the authoritative interface.
 
 ### Revocation
 
-An administrator must be able to revoke an application's access.
+An administrator must be able to revoke a subscriber's access.
 
-Revocation must affect only the relevant application's access to the relevant stream.
+Revocation must affect only the relevant subscriber's access to the relevant stream.
 
-Other applications must continue operating normally.
+Other subscribers must continue operating normally.
 
 The behaviour of existing SSE connections after revocation must be defined in the authentication protocol.
 
 ### Security boundaries
 
-Pulsyflux must distinguish applications and operating-system users.
+Pulsyflux must distinguish subscriber installations and operating-system users.
 
 It must not assume that every local process is trusted merely because the service listens on loopback.
 
 The implementation must consider:
 
-- Applications running under different operating-system users.
-- Unauthorised processes attempting to impersonate approved applications.
+- Subscriber applications running under different operating-system users.
+- Unauthorised processes attempting to impersonate approved subscribers.
 - Credential theft and reuse.
 - Replay of authentication requests.
 - Local credential disclosure.
 - Credential revocation.
-- Key rotation.
-- Compromised application credentials.
+- Bearer credential rotation.
+- Compromised subscriber credentials.
 - Unauthorised access to per-stream pending approval files.
 - Unauthorised administrator access.
 - Attempts to approve subscriptions without administrator authentication.

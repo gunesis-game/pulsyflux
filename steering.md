@@ -1664,7 +1664,7 @@ Settled:
 Still to specify:
 
 - Browser clients that cannot set an `Authorization` header through native `EventSource` use `fetch()` streaming and an SSE parser; no cookie-based or URL-based credential alternative is supported.
-- Secure storage expectations for the credential at the subscriber.
+- Pulsyflux-side credential security: secure generation, storage, one-time delivery, validation and revocation, and preventing credentials from appearing in logs or error responses. Client-side credential storage is outside this project's scope.
 - The exact timeout HTTP response and SSE connection-closing sequence.
 - Existing SSE connection behaviour after revocation.
 - Whether one credential may be used by multiple simultaneous SSE connections.

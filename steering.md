@@ -3,7 +3,14 @@
 
 Read this file first. It owns the mission, decisions and working rules for the repo. When the repo is created, this file moves to the repo root as `steering.md` in the first scaffold commit.
 
-This file is self-contained. It does not depend on any other repo or steering file. Every rule needed to build the project is written here.
+This file is self-contained. It does not depend on any other repo or steering file.
+
+### Working rules
+
+- All work is performed directly on `main`. Never create or use another branch.
+- Do not create GitHub Issues or pull requests.
+- The current phase is steering/design only. Do not implement software or scaffold the repository until the user explicitly authorises implementation.
+- Update this steering file as decisions are agreed; do not silently treat proposals as settled decisions. Every rule needed to build the project is written here.
 
 ## Mission
 
@@ -1346,44 +1353,52 @@ Do not use subtest path filters.
 
 ## Development iteration tracking
 
-Development is organised into small, verifiable iterations.
+Development is organised into small, verifiable iterations once implementation has been explicitly authorised.
 
 Git history shows exactly what changed.
 
-GitHub Issues and pull requests show why it changed and how it was reviewed.
+The iteration log provides a durable project-level record of progress and decisions. Do not keep an ever-growing chronological diary inside this steering file.
 
-The iteration log provides a durable project-level record of progress and decisions.
+This file defines the tracking rules. Store implementation iteration records in the repository under `docs/iterations/` when implementation begins.
 
-Do not keep an ever-growing chronological diary inside this steering file.
+### Current project phase
 
-This file defines the tracking rules. Store the actual records in the repository under `docs/iterations/`.
+The project is currently in the steering and design phase.
+
+- Work is limited to reading, discussing, refining and updating project documentation and decisions, especially this `steering.md`.
+- Do not implement application code, create the AsyncAPI contract, generate code, scaffold packages, add implementation tests, or begin packaging.
+- Do not begin implementation until the user explicitly says that the steering/design phase is complete and authorises implementation.
+- A proposed design is not an approved decision until it has been agreed with the user and recorded in this file.
+- When an unresolved decision affects architecture or externally visible behaviour, resolve it here before implementation.
 
 ### Iteration unit and workflow
 
-- An iteration is a small, coherent increment that can be implemented, verified and reviewed as one unit. Prefer a working vertical slice over a large phase of disconnected implementation.
-- Track each iteration with a GitHub Issue. Give it a clear goal and observable completion criteria. Link related issues rather than combining unrelated work.
-- Implement the iteration on a short-lived branch and submit it through a pull request, following the Git workflow below.
-- A pull request must link its iteration issue and identify the relevant requirements or acceptance criteria it satisfies. If it changes the public contract, link the affected AsyncAPI operations or schemas.
-- Do not mark an iteration complete merely because code has been written. Its completion criteria must pass, required tests must run, and the change must be merged to `main`.
-- If an iteration is split, blocked, descoped or its acceptance criteria change, record that explicitly in its issue and iteration record. Do not silently redefine completion.
+After implementation is explicitly authorised:
+
+- An iteration is a small, coherent increment that can be implemented, verified and reviewed as one unit.
+- Work directly on the `main` branch. Do not create, use or switch to other branches.
+- Do not create GitHub Issues or pull requests. Track goals, scope, decisions and outcomes in the iteration records and commit history.
+- Each iteration must have a clear goal and observable completion criteria. Prefer a working vertical slice over a large phase of disconnected implementation.
+- If an iteration is split, blocked, descoped or its acceptance criteria change, record that explicitly in its iteration record. Do not silently redefine completion.
+- Keep commits focused and describe the purpose and scope accurately.
 
 ### Iteration records
 
-Create one Markdown record per iteration in `docs/iterations/`, named `NNN-short-description.md` (for example, `001-project-scaffold.md`).
+Create one Markdown record per implementation iteration in `docs/iterations/`, named `NNN-short-description.md` (for example, `001-project-scaffold.md`).
 
 Maintain `docs/iterations/README.md` as a concise index in iteration order, linking each record and showing its status.
 
 Each iteration record contains:
 
-1. **Identity:** iteration number, title, GitHub Issue and pull request links, branch, and relevant milestone or release target if any.
+1. **Identity:** iteration number, title, branch (`main`), and relevant milestone or release target if any.
 2. **Goal:** the user-visible or engineering outcome intended, and why it matters to Pulsyflux.
 3. **Scope:** what is included and explicitly excluded from this iteration.
 4. **Requirements:** the requirement IDs or acceptance criteria being addressed. If a requirement is not yet written, link the relevant steering decision instead; do not invent requirements.
 5. **Plan:** the small implementation steps and expected deliverables.
 6. **Verification:** the exact commands and checks to run, plus any platform-specific manual checks. Record which checks actually ran and their results; distinguish not run, failed and passed.
-7. **Outcome:** what was delivered, with links to the merge commit, pull request and relevant artifacts where applicable.
+7. **Outcome:** what was delivered and the resulting commit(s) or relevant artifacts.
 8. **Deviations and decisions:** scope changes, trade-offs, newly discovered constraints and any steering/spec changes required.
-9. **Follow-ups:** unresolved defects or work intentionally deferred, linked to issues.
+9. **Follow-ups:** unresolved defects or work intentionally deferred, recorded in the iteration log.
 
 ### Status and completion
 
@@ -1400,34 +1415,35 @@ Definitions:
 - `planned`: agreed and not started.
 - `in progress`: implementation or verification has started.
 - `blocked`: progress cannot continue until a named dependency or decision is resolved; state what is needed.
-- `completed`: acceptance criteria passed, verification results recorded, and the pull request merged to `main`.
+- `completed`: acceptance criteria passed and verification results recorded.
 - `cancelled`: intentionally abandoned; record why and whether replacement work exists.
 
-Update the index and iteration record in the same pull request that changes the iteration's status or materially changes its scope.
+Update the index and iteration record in the same commit that changes the iteration's status or materially changes its scope.
 
 Keep records factual and concise.
 
 Never claim a test, installer, service lifecycle check or release step passed unless its result was observed and recorded.
 
-The iteration log supplements, but does not replace, GitHub Issues, pull requests, commit history, the requirements/specification documents or CI results.
+The iteration log supplements, but does not replace, commit history, the requirements/specification documents or CI results.
 
 It must not become a second source of product decisions: decisions that change scope or externally visible behaviour must be reflected in this steering file or the owning specification, according to the authority order above.
 
 ## Git workflow and GitHub releases
 
-GitHub is the source-of-truth remote for the repository, pull requests, CI and published releases.
+GitHub is the source-of-truth remote for the repository, commits, CI and published releases.
 
 The release workflow produces installable packages for Windows and Linux; a release is not considered complete if it contains only raw build binaries.
 
 ### Branch and change workflow
 
-- `main` is the protected integration branch. It must always build and pass the full verification and test gates.
-- Work is done on short-lived branches named for the change, such as `feature/<topic>`, `fix/<topic>` or `docs/<topic>`.
-- Changes enter `main` through pull requests. Do not push feature work directly to `main`.
-- Every pull request runs the same required checks as a normal CI build: generation checks, formatting, architecture checks, dependency tidiness, vet, static analysis, dead-code checks, tests and build.
-- A pull request that changes `api/asyncapi.yaml` must include the regenerated `generated/` output. CI fails if generated output is stale.
-- Keep commits focused. A contract change, its generated output, implementation and tests belong in the same logical change.
-- Merge only when all required checks pass. No gate is skipped or made advisory.
+- All repository work is performed directly on the `main` branch.
+- Do not create, use, check out, merge or push any other branch.
+- Do not create GitHub Issues or pull requests. Project planning, open decisions and progress are recorded in `steering.md`, implementation iteration records and commit history.
+- Before changing a file, inspect the current `main` version and preserve unrelated content.
+- Keep commits focused. A contract change, its generated output, implementation and tests belong in the same logical change once implementation is authorised.
+- Keep `main` buildable and passing the full verification and test gates once implementation begins.
+- A change to `api/asyncapi.yaml` must include the regenerated `generated/` output. CI fails if generated output is stale.
+- No gate is skipped or made advisory.
 
 ### Versioning and release trigger
 
@@ -1435,7 +1451,7 @@ The release workflow produces installable packages for Windows and Linux; a rele
 - A GitHub Release is created from a version tag. The tag must point to a commit on `main` that has passed the required CI workflow.
 - The release workflow validates that the tag is a valid semantic version and that the version embedded in release metadata matches the tag.
 - Release artifacts are built from the tagged commit, not from an uncommitted workspace or a later branch head.
-- Releases are published as GitHub Releases with generated release notes and attached installer packages. Do not publish a release if any required platform package fails.
+- Releases are published as GitHub Releases with generated release notes and attached installer packages.
 
 ### Installer artifacts
 
@@ -1535,261 +1551,6 @@ Publish only after all required jobs succeed.
 The release workflow must be reproducible from a tag: rerunning it for the same tag must use the same source commit and produce the same set of named artifacts.
 
 Where byte-for-byte reproducibility is not achievable because of platform packaging metadata, record that limitation. Do not silently claim reproducible binaries.
-
-## Testing
-
-### Rules
-
-**Always the real thing**
-
-The bus has no external backend, so every test runs real production code. Nothing is faked.
-
-- Tests use no fakes, stubs, mocks, spies or substitute implementations, and add no interfaces that exist only so tests can swap something in.
-- Production code has no test mode, no test-only flags or branches, and no fixture or `/testing/*` endpoints.
-- Integration tests in `internal/integration` start the production service through the same bootstrap function `main` uses, on an ephemeral loopback port (`127.0.0.1:0`). After that, they talk to it only over real HTTP and SSE.
-- Tests change behaviour only through production configuration, using the same settings a user can set: schema and request-body size limits, retention limits, subscriber queue size, heartbeat interval, trace queue size, trace flush interval and trace rotation limits. Small values make overflow, eviction and gap cases fast to reach.
-- Unit tests in `internal/broker` and `internal/streamid` call the real types directly. They cover what is hard to reach over HTTP: races (run with `-race`), eviction order and the RFC 8785 vectors.
-- `internal/testsupport` holds only client-side helpers: an SSE client that reads the real stream, and contract assertions. It never stands in for any part of the bus.
-- Every test helper calls `t.Helper()` first.
-
-Authentication tests must also use the real authentication implementation.
-
-They must cover:
-
-- An application attempting to subscribe to a stream for the first time.
-- A pending subscription being recorded in the correct per-stream file.
-- Pending subscriber information being isolated between streams.
-- Persistent approval being scoped to an application–stream combination.
-- Approval for one stream not granting access to another stream.
-- An approved application–stream authorisation surviving a process restart.
-- An unauthorised application being unable to approve its own subscription.
-- An unauthenticated administrator being unable to access administration operations.
-- An administrator authenticating through the administration interface.
-- An administrator selecting a stream and retrieving its pending subscribers.
-- An administrator approving a pending subscriber.
-- An administrator rejecting a pending subscriber.
-- A pending SSE connection remaining open while awaiting approval.
-- No message events being delivered before approval.
-- An approved pending subscription proceeding on the existing SSE connection.
-- An unapproved subscription timing out after the configured maximum waiting period.
-- The timeout behaviour not revealing whether the administrator rejected the subscription or simply did not approve it.
-- Pulsyflux recording approval and rejection decisions internally.
-- An approved application making subsequent subscriptions without repeating the complete approval process.
-- An approved application being automatically recognised only for streams it has already been authorised to access.
-- A new application–stream combination requiring administrator approval.
-- Invalid credentials preventing access.
-- Revocation preventing further access by the relevant application.
-- Revocation for one application–stream combination not affecting unrelated applications or streams.
-- Credential isolation between applications.
-- Credential rotation not unintentionally invalidating unrelated applications.
-- Pending approval files surviving a process restart.
-- Persistent approved authorisation records surviving a process restart.
-- Authentication working through ordinary HTTP and SSE without requiring a Go client library.
-- Applications belonging to different operating-system users being distinguished and isolated.
-- Revocation behaviour for existing SSE connections being verified according to the documented protocol.
-
-No test-only authentication shortcuts or substitute authentication implementations are permitted.
-
-**Assertions**
-
-- Every JSON request body, JSON response body and SSE data-event payload a test observes is validated against the contract schemas (`testsupport.AssertConforms`).
-- SSE comments (including `: subscribed` and `: heartbeat`) are asserted as protocol comments, not validated as JSON schemas.
-- A test that would still pass if the service broke the contract is incomplete.
-- No `time.Sleep` for synchronisation. Wait for `: subscribed`, a specific `seq`, an explicit approval outcome or a timeout.
-
-### Required test catalogue
-
-#### Contract
-
-- The contract validates against the AsyncAPI 3.1.0 meta-schema.
-- Every message has a valid example.
-- Invalid documents fail with a list of problems.
-- `/asyncapi.yaml` returns the exact bytes.
-- Fingerprint matches.
-- Docs page loads, references the vendored assets, and console data matches the operations.
-
-#### Stream ID
-
-- Same schema with different key order or whitespace gives the same ID.
-- Any semantic change gives a different ID.
-- Rejects a missing or different `$schema`, a meta-schema violation, a remote `$ref`, a boolean schema, an oversized schema.
-- RFC 8785 test vectors.
-
-#### Register
-
-- Registering the same schema twice is idempotent.
-- Get-schema returns a schema whose hash equals the ID.
-
-#### Publish
-
-- Valid publish returns `seq`.
-- Data failing the stream schema returns 400 with details.
-- Unknown stream returns 404.
-- Malformed ID returns 400.
-- Oversized body returns 413.
-- Invalid JSON returns 400.
-
-#### Ordering
-
-- `seq` starts at 1 per stream and process run, is strictly increasing within that run, and message identity includes `runId`.
-- `runId` is stable for one process lifetime and changes on restart.
-
-#### Fan-out
-
-- Every subscriber of a stream receives every message once.
-- Subscribers of other streams receive nothing.
-
-#### Wire format
-
-- Message SSE frames carry `id: <runId>:<seq>`, the event type and the documented envelope.
-- The first frame is `: subscribed`.
-- Heartbeats are comments.
-- Field names in the publish body and the SSE envelope are identical.
-
-#### Replay
-
-- A subscription without a cursor replays all currently retained messages, then continues live.
-- Resume with a valid current-run `Last-Event-ID` HTTP header replays exactly the retained messages after the cursor, then continues live.
-- No `lastEventId` query parameter is accepted or required for replay.
-- A cursor from an older `runId` is treated as invalid for replay; replay all messages retained in the current run, then continue live.
-
-#### Gaps
-
-- Resume past evicted messages gets one `stream.gap` with the correct range.
-
-#### Retention
-
-- Eviction by message count and by bytes.
-
-#### Backpressure
-
-- A slow subscriber overflows alone, drains already-queued messages, receives a terminal gap through the reserved control slot, then disconnects; others keep receiving.
-- Replay larger than the subscriber data queue drains accepted messages, receives a terminal gap covering the remaining replay snapshot, and disconnects without deadlocking; replay exactly at the limit stays open.
-- A subscriber that drains catches up on buffered messages.
-
-#### Lifecycle
-
-- Closed subscriptions stop receiving.
-- Subscriber counts in `/health` follow connects and disconnects.
-- First-subscriber and last-subscriber hooks fire exactly once per transition.
-
-#### Concurrency
-
-- Concurrent publish, subscribe and unsubscribe on one stream under `-race`: no panic, no lost or duplicated delivery to live subscribers.
-- Unsubscribing an earlier subscriber does not remove or break a later one.
-- Concurrent publish and subscription activity does not reorder per-subscriber delivery or affect unrelated subscribers.
-
-#### Ordering
-
-- Retention eviction never resets or reuses `seq` during a process lifetime.
-
-#### Race
-
-- A message published immediately after `: subscribed` is delivered.
-
-#### Errors
-
-- Errors before streaming use HTTP status codes, not in-stream frames.
-
-#### Health
-
-- Ready and not-ready states.
-
-#### Streams
-
-- `GET /v1/streams` lists registered streams with correct counts after publishes, rejections, connects and disconnects.
-
-#### Trace
-
-- One publish to a stream with two subscribers traces `publish.accepted`, then one `delivery` per subscription, all with higher `traceSeq`.
-- `traceSeq` is strictly increasing per stream under concurrent publishes (`-race`); every trace event has the process `runId`.
-- Rejected publish to a known stream, subscription open with `Last-Event-ID`, gap, overflow and close each produce their trace kind with the documented `detail`.
-- Per-stream trace contains only that stream's events.
-- Trace SSE resumes from the `Last-Event-ID` HTTP header and reports `trace.gap` when rotation has removed requested events.
-- No trace resume query parameter is supported.
-
-#### Trace file
-
-- With a stream's trace file in `t.TempDir()`, every line is a contract-valid `TraceEvent`, in `traceSeq` order, matching the stream's trace SSE.
-- Rotation at `trace.maxFileBytes` retains at most `trace.maxFiles` total files, including the active file; events are either retained or their loss is visible as `trace.gap`.
-- A trace queue sized 1 under load records `trace.dropped` with the correct count before the next successfully recorded event; publishes are not slowed down or failed.
-
-#### Monitor
-
-- `/streams` returns the page with the CSP header, references only same-origin assets, and calls only contract operations.
-
-#### Authentication administration
-
-- The administration page is served locally.
-- The page uses only same-origin assets.
-- The page sends the required CSP header.
-- Administrator credentials are required before pending subscriber information can be accessed.
-- An unauthenticated user cannot approve or reject subscriptions.
-- An authenticated administrator can select a stream.
-- The pending subscribers shown belong only to the selected stream.
-- Approving a subscriber updates the correct stream's pending approval file.
-- Rejecting a subscriber updates the correct stream's pending approval file.
-- Approval or rejection for one stream does not affect another stream.
-- Approval creates the correct persistent application–stream authorisation.
-- An ordinary application cannot invoke administrator actions.
-
-#### Authentication and subscription approval
-
-- An application can attempt to subscribe through the documented HTTP/SSE interface.
-- A subscription requiring approval is recorded in the correct per-stream pending approval file.
-- Pending approval files are independent between streams.
-- A pending application cannot publish or receive stream messages.
-- An unauthorised application cannot approve its own subscription.
-- An administrator can approve a pending subscription.
-- An administrator can reject a pending subscription.
-- An approved pending SSE connection proceeds on the same connection.
-- No message events flow before approval.
-- The pending SSE connection remains open while approval is being considered.
-- The maximum approval waiting period is 10 minutes.
-- A subscription that does not receive approval within the waiting period is closed using the standard timeout behaviour.
-- The timeout behaviour does not reveal whether the administrator rejected the subscription or simply did not approve it.
-- Pulsyflux records the approval or rejection decision internally.
-- An approved application can authenticate subsequent subscriptions without repeating the complete approval process.
-- An approved application is automatically recognised for the same stream only.
-- An application requesting a different stream must obtain approval for that stream.
-- An application without valid credentials cannot publish or subscribe.
-- An application cannot access a stream for which it has no approved access.
-- Revoking one application's access prevents that application from accessing the relevant stream.
-- Revoking one application's access does not affect another application's access.
-- Revoking access to one stream does not revoke access to unrelated streams.
-- Credential rotation does not unintentionally invalidate unrelated applications.
-- Credentials cannot be retrieved by unauthorised applications.
-- Authentication works through ordinary HTTP and SSE requests without requiring a Go client library.
-- Applications belonging to different operating-system users are distinguished and isolated.
-- Revocation behaviour for existing SSE connections is verified according to the documented protocol.
-- Pending approval files remain available after a process restart.
-- Approved application–stream authorisation records remain available after a process restart.
-- A previously approved application does not need another administrator approval for the same stream.
-- A new application–stream combination requires administrator approval.
-
-### Client responsibilities
-
-Client behaviours (reconnect with backoff, resume from the last seen run-scoped message cursor using the `Last-Event-ID` HTTP header, and deduplication of replayed messages by `(runId, seq)`) are client responsibilities.
-
-The bus contract and integration tests verify the resume and replay behaviour the bus provides; they do not claim to implement or test a general-purpose client SDK.
-
-The standard `Last-Event-ID` HTTP header is the only supported mechanism for supplying an SSE resume cursor.
-
-There is no query-parameter alternative such as `?lastEventId=`.
-
-A client SDK is optional.
-
-No application is required to use a Go SDK.
-
-## Out of scope until separately specified
-
-- Durable storage of streams and messages, consumer groups, acknowledgement and redelivery, dead-letter queues.
-- Relaying messages between several bus instances, and suppressing echoes of a bus's own messages.
-- File or blob transfer, WebRTC.
-- Webhook push delivery.
-- Request/reply correlation over the bus.
-- Mandatory client SDKs or language-specific authentication libraries.
-- Moving existing applications onto this bus. Each move gets its own spec.
 
 ## Open decisions
 

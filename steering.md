@@ -387,6 +387,13 @@ A subscriber installation must be distinguishable from other subscribers when re
 
 The Name is stored per subscriber–stream relationship. The same Subscriber ID may therefore have different Names for different streams. On a subsequent request, the latest supplied Name for that relationship becomes the name shown in the administration interface.
 
+Name changes are handled as follows:
+
+- For an approved subscriber–stream relationship, Pulsyflux validates the relationship's bearer credential before accepting a Name update. A request with an invalid or missing credential must not change the stored Name.
+- For a pending subscriber–stream relationship, a repeat request from the same Subscriber ID updates the existing pending record's Name. It does not create a duplicate pending record or reset the original 10-minute approval deadline.
+- Updates to a stream's subscriber records are serialised. When requests for the same subscriber are concurrent, the last request processed while holding that stream's record lock determines the stored Name.
+- A Name update affects only the requested subscriber–stream relationship. It does not change the Subscriber ID, credentials or Names stored for other streams.
+
 The Subscriber ID and Name are identifiers and descriptive metadata only. Neither is secret, neither proves identity, and neither grants access. Authorisation is established by the credential associated with the specific subscriber–stream relationship.
 
 The Subscriber ID must allow Pulsyflux to:
@@ -1646,12 +1653,16 @@ Settled:
 - Subscriber IDs are normalised to lowercase before storage and comparison. A Subscriber ID is an identifier, not a secret or proof of authorisation.
 - Subscriber Names are required and must not be empty or consist only of whitespace.
 - Subscriber Names are limited to 64 Unicode characters.
+- For approved relationships, a Name update requires successful validation of that relationship's bearer credential; invalid or missing credentials cannot change the Name.
+- For pending relationships, a repeat request updates the existing Name without creating a duplicate pending record or resetting the original approval deadline.
+- Concurrent subscriber-record updates are serialised per stream; the last request processed under that stream's record lock determines the stored Name.
+- Name updates are scoped to one subscriber–stream relationship and do not alter identity, credentials or other streams' Names.
 - Leading and trailing whitespace is removed from Subscriber Names before storage and display.
 - Subscriber Names containing control characters are rejected. Other normal Unicode characters, spaces and punctuation are allowed.
 - A Subscriber Name is descriptive only; changing it does not change the subscriber's identity or credentials.
 
 Still to specify:
-- Exact behaviour when a subscriber changes its Name, including how concurrent requests update the displayed value.
+
 - Browser clients that cannot set an `Authorization` header through native `EventSource` use `fetch()` streaming and an SSE parser; no cookie-based or URL-based credential alternative is supported.
 - Secure storage expectations for the credential at the subscriber.
 - The exact timeout HTTP response and SSE connection-closing sequence.

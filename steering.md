@@ -543,7 +543,14 @@ The credential is a secret: possession of it grants the bearer the access associ
 
 Subscriber applications must not be required to generate key pairs, sign challenges, or implement their own cryptographic challenge-response infrastructure. Pulsyflux handles credential generation and verification internally.
 
-The subscriber must be able to retain its credential and present it when reconnecting. The exact credential entropy, encoding, hashing and storage format, initial delivery event, returning-request header format, secure subscriber-side storage expectations, rotation procedure and recovery behaviour remain to be specified.
+After an administrator approves a pending subscriber–stream request, Pulsyflux delivers the newly generated bearer credential to that subscriber on the existing pending SSE connection, using a dedicated `pulsyflux.credential` event. The event data is a JSON object with a `credential` string field, for example:
+
+```text
+event: pulsyflux.credential
+data: {"credential":"<random-secret>"}
+```
+
+The credential is delivered only after approval and before message events are allowed to flow. The subscriber must retain the credential and present it when reconnecting. The exact credential entropy, encoding, hashing and storage format, returning-request header format, secure subscriber-side storage expectations, rotation procedure and recovery behaviour remain to be specified.
 
 ### Subsequent subscriptions
 
@@ -1558,6 +1565,7 @@ Settled:
 - Approval for one stream does not grant access to another stream.
 - Subscriber applications do not generate key pairs and do not need to implement authentication modules or their own cryptographic operations.
 - Pulsyflux generates a random bearer credential for each approved subscriber–stream relationship.
+- After approval, Pulsyflux delivers the credential on the existing pending SSE connection using the dedicated `pulsyflux.credential` event, with a JSON `credential` field.
 - A bearer credential is specific to exactly one Subscriber ID and Stream ID.
 - Pulsyflux manages credential generation, validation, storage and revocation.
 - Pending subscriber approvals are maintained in separate per-stream files on disk.
@@ -1580,7 +1588,6 @@ Still to specify:
 - Exact behaviour when a subscriber changes its Name, including how concurrent requests update the displayed value.
 - Exact credential entropy, random-generation requirements, encoding and wire format.
 - Whether Pulsyflux stores a one-way hash of the bearer credential and the exact hash/storage format.
-- How the initial bearer credential is delivered to the subscriber after approval.
 - The exact returning-subscription request format and how the bearer credential is presented.
 - Secure storage expectations for the credential at the subscriber.
 - Credential rotation, replacement and compromised-credential recovery.

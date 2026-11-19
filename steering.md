@@ -386,11 +386,11 @@ Applications are independently existing applications. Pulsyflux does not create 
 
 An application must be distinguishable from other applications when requesting access to a stream.
 
-A stable application ID supplied by the application has been proposed as a possible identification mechanism, but this has not yet been approved as a settled decision.
+**Settled decision:** An application's identity is the SHA-256 fingerprint of its cryptographic public key. The application proves control of the corresponding private key during authentication. The fingerprint, rather than an application-supplied name or ID, is the stable identity used to associate the application with its stream authorisations.
 
-The exact application identification mechanism remains open.
+The public-key encoding, fingerprint input format, and proof-of-possession protocol remain to be specified.
 
-Whatever mechanism is selected must allow Pulsyflux to:
+This identity mechanism must allow Pulsyflux to:
 
 - Recognise the same application across subsequent connections.
 - Associate an application with its previously approved stream authorisations.
@@ -1595,9 +1595,8 @@ Still to specify:
 - Secure credential provisioning and storage mechanism.
 - How credentials are made available to independently existing applications without introducing application creation or application registration.
 - Authentication request format for subsequent subscriptions.
-- How an application is recognised across subsequent connections.
-- Whether a stable application ID supplied by the application is the chosen identification mechanism.
-- How the service distinguishes a previously approved application from an impersonating process.
+- How proof of possession is performed on subsequent connections.
+- How the service protects against replay and impersonation attempts.
 - The exact timeout HTTP response and SSE connection-closing sequence.
 - Existing SSE connection behaviour after revocation.
 - Key rotation and compromised-key recovery.
@@ -1606,9 +1605,7 @@ Still to specify:
 
 Specify how applications are distinguished from one another and how applications running under different operating-system users are represented and isolated.
 
-A stable application ID supplied by the application has been proposed but has not yet been approved as the final identification mechanism.
-
-The implementation must prevent one local application from impersonating another registered or previously approved application.
+Application identity is the SHA-256 fingerprint of the application's cryptographic public key. The implementation must prevent one local application from impersonating another previously approved application. Operating-system-user isolation and the limits of credential isolation between applications running as the same OS user remain to be specified.
 
 ### 3. Publisher ownership
 

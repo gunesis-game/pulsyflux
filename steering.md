@@ -1684,7 +1684,7 @@ The one-subscriber-record-file-per-stream storage model is settled: each file co
 }
 ```
 
-The `pending` array contains pending subscriber approval records for that stream. The `approved` array contains approved subscriber–stream authorisation records for that stream. Backwards compatibility with earlier file formats is not required; the implementation does not need to preserve compatibility when the format changes. The record fields, validation, atomic-write procedure and other implementation details remain open.
+The `pending` array contains pending subscriber approval records for that stream. Each pending record contains `subscriberId` (the subscriber's UUID), `name` (the subscriber-supplied display name for this stream) and `requestedAt` (the request time as an ISO 8601 UTC timestamp). The `approved` array contains approved subscriber–stream authorisation records for that stream. Backwards compatibility with earlier file formats is not required; the implementation does not need to preserve compatibility when the format changes. The approved-record fields, validation rules, atomic-write procedure and other implementation details remain open.
 
 ### 5. Subsequent subscriptions
 

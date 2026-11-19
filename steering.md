@@ -168,7 +168,7 @@ Persistent approved subscriber–stream authorisations must also survive a proce
 
 Pulsyflux is responsible for generating, validating, storing and revoking subscriber credentials. Subscriber applications must not need to implement their own cryptographic authentication modules.
 
-Pulsyflux does not create subscriber applications or operate an application-registration process. A subscriber requests access by attempting to subscribe.
+Pulsyflux does not create subscriber applications or operate a subscriber-registration process. A subscriber requests access by attempting to subscribe.
 
 Authentication must work through the documented HTTP and SSE interfaces, independently of the programming language used by a subscriber application.
 
@@ -347,17 +347,17 @@ Authentication is built into Pulsyflux. It is not a separate service, process, s
 
 Authentication is an internal subscriber to a stream, following the same general internal subscriber model used by tracing.
 
-It is responsible for subscriber approval, administrator authentication, credential management, authorisation and revocation.
+It is responsible for subscriber approval, administrator authentication, bearer credential management, authorisation and revocation.
 
-The purpose of this design is to make secure messaging straightforward for application developers. Applications should not have to implement their own authentication infrastructure or cryptographic security modules.
+The purpose of this design is to make secure messaging straightforward for subscriber application developers. Subscriber applications should not have to implement their own authentication infrastructure or cryptographic security modules.
 
 Pulsyflux owns the security responsibilities.
 
-Applications exist independently of Pulsyflux. Pulsyflux does not create applications or introduce an application-registration workflow.
+Subscriber applications exist independently of Pulsyflux. Pulsyflux does not create subscriber applications or introduce a subscriber-registration workflow.
 
-Applications request access by attempting to subscribe to a stream. Pulsyflux authorises those requests.
+A subscriber requests access by attempting to subscribe to a stream and supplying its stable Subscriber ID and descriptive Name. Pulsyflux authorises access using the bearer credential associated with the specific subscriber–stream relationship.
 
-Pulsyflux manages application authentication and credential security. It does not issue application credentials as part of creating or registering an application. The precise credential provisioning and delivery arrangement remains to be specified.
+Pulsyflux generates and manages the random bearer credential for an approved subscriber–stream relationship. The exact credential provisioning, delivery, storage and returning-request format remain to be specified.
 
 ### Authentication architecture
 
@@ -442,7 +442,7 @@ If approval is granted before the timeout:
 
 - The existing SSE connection proceeds.
 - Normal stream events can flow.
-- The application does not need to establish a second subscription merely because approval was pending.
+- The subscriber does not need to establish a second subscription merely because approval was pending.
 - The approved subscriber–stream authorisation is stored persistently.
 
 If the waiting period expires without successful approval:
@@ -519,7 +519,7 @@ It does not require a separate frontend application or build step.
 
 Administrator credentials and administrator access must be protected from ordinary subscriber applications.
 
-An ordinary application must not be able to approve its own subscription or perform administrator actions.
+An ordinary subscriber application must not be able to approve its own subscription or perform administrator actions.
 
 The exact administrator credential provisioning and authentication mechanism remains to be specified.
 
@@ -1606,7 +1606,7 @@ Specify:
 - Whether multiple administrators are supported.
 - How administrator credentials can be changed or recovered.
 
-The administrator interface must not allow an ordinary local application to approve subscriptions or revoke credentials.
+The administrator interface must not allow an ordinary local subscriber application to approve subscriptions or revoke credentials.
 
 ### 4. Pending approval storage
 

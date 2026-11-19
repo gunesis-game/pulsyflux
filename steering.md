@@ -361,6 +361,8 @@ If the file does not exist, the local HTML administration page presents the init
 
 The initial setup flow is available only while the administrator credential file does not exist. On subsequent startups, the administration page presents the normal administrator sign-in flow rather than asking the administrator to create credentials again.
 
+Administrator passwords are hashed using Argon2id with a unique cryptographically random salt for each password. The stored password hash representation includes the algorithm version, parameters, salt and derived hash so that verification is reproducible and parameters can be changed in the future. Plaintext passwords are never written to the credential file.
+
 
 Subscriber applications exist independently of Pulsyflux. Pulsyflux does not create subscriber applications or introduce a subscriber-registration workflow.
 

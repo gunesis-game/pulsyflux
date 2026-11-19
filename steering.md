@@ -593,6 +593,14 @@ This decision addresses theft or copying of the stream file only. Detection or p
 
 The plaintext credential exists only as needed to deliver it to the approved subscriber. Pulsyflux must not be able to recover an issued credential from its persistent authorisation records.
 
+Credential delivery has the following additional requirements:
+
+- Pulsyflux must durably persist the approved subscriber–stream authorisation record, including the credential digest, before attempting to deliver the plaintext credential.
+- The `pulsyflux.credential` event is a one-time delivery. It must not be included in SSE replay or otherwise replayed after the original delivery attempt.
+- Pulsyflux must not automatically resend a credential when delivery fails or when receipt is uncertain. An authenticated administrator must initiate credential replacement; replacement follows the established approval and invalidation rules.
+- Authentication responses and the pending SSE response must use cache-prevention headers so credentials are not stored by HTTP caches.
+- The credential must never appear in a URL, query parameter, trace, ordinary log, error response or administrator UI.
+
 The subscriber application is responsible for securely retaining its credential. File-based storage is under consideration; the storage policy and exact subscriber-side storage expectations remain to be specified.
 
 ### Credential recovery and replacement
@@ -1663,15 +1671,8 @@ Settled:
 
 Still to specify:
 
-- Browser clients that cannot set an `Authorization` header through native `EventSource` use `fetch()` streaming and an SSE parser; no cookie-based or URL-based credential alternative is supported.
-- Pulsyflux-side credential security: secure generation, storage, one-time delivery, validation and revocation, and preventing credentials from appearing in logs or error responses. Client-side credential storage is outside this project's scope.
-- Revocation immediately invalidates the credential for the affected Subscriber ID–Stream ID relationship and terminates every active SSE connection authenticated with that credential.
-- Revocation prevents any further message delivery to those connections; queued but undelivered messages are discarded.
-- Pulsyflux sends `subscription.closed` with `{"code":"not_authorised"}`, flushes the terminal event, and closes each affected connection.
-- A revoked relationship cannot reconnect using its old credential and must go through administrator approval again before a new credential is issued.
-- Revocation does not affect other subscriber–stream relationships, including the same Subscriber ID on other streams.
-
-- The exact pending approval and persistent subscriber–stream authorisation record formats.
+- Browser clients that cannot set an `Authorization` header through native `EventSource` need a documented way to receive SSE while supplying the bearer credential. The browser transport and parser requirements remain to be settled; cookie-based and URL-based credential alternatives are not supported.
+- The exact pending approval and persistent subscriber–stream authorisation record formats, including validation, atomic-write and corruption-recovery behaviour.
 
 ### 2. Publisher ownership
 

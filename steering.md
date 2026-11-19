@@ -686,11 +686,11 @@ The HTTP and SSE contract remains the authoritative interface.
 
 An administrator must be able to revoke a subscriber's access.
 
-Revocation must affect only the relevant subscriber's access to the relevant stream.
+Revocation must affect only the relevant subscriber's access to the relevant stream. Other subscribers and other subscriber–stream relationships must continue operating normally.
 
-Other subscribers must continue operating normally.
+When access is revoked, Pulsyflux immediately invalidates the affected relationship's credential and terminates every active SSE connection authenticated with it. No further messages may be delivered; queued but undelivered messages are discarded. Pulsyflux sends `subscription.closed` with `{"code":"not_authorised"}`, flushes the event, and closes each affected connection.
 
-The behaviour of existing SSE connections after revocation must be defined in the authentication protocol.
+The revoked relationship cannot reconnect using its old credential. It must go through administrator approval again before a new credential is issued.
 
 ### Security boundaries
 
@@ -1664,7 +1664,11 @@ Still to specify:
 
 - Browser clients that cannot set an `Authorization` header through native `EventSource` use `fetch()` streaming and an SSE parser; no cookie-based or URL-based credential alternative is supported.
 - Pulsyflux-side credential security: secure generation, storage, one-time delivery, validation and revocation, and preventing credentials from appearing in logs or error responses. Client-side credential storage is outside this project's scope.
-- Existing SSE connection behaviour after revocation.
+- Revocation immediately invalidates the credential for the affected Subscriber ID–Stream ID relationship and terminates every active SSE connection authenticated with that credential.
+- Revocation prevents any further message delivery to those connections; queued but undelivered messages are discarded.
+- Pulsyflux sends `subscription.closed` with `{"code":"not_authorised"}`, flushes the terminal event, and closes each affected connection.
+- A revoked relationship cannot reconnect using its old credential and must go through administrator approval again before a new credential is issued.
+- Revocation does not affect other subscriber–stream relationships, including the same Subscriber ID on other streams.
 - Whether one credential may be used by multiple simultaneous SSE connections.
 - The exact pending approval and persistent subscriber–stream authorisation record formats.
 

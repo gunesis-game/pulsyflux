@@ -1671,7 +1671,6 @@ Settled:
 
 Still to specify:
 
-- Browser clients that cannot set an `Authorization` header through native `EventSource` need a documented way to receive SSE while supplying the bearer credential. The browser transport and parser requirements remain to be settled; cookie-based and URL-based credential alternatives are not supported.
 - The exact pending approval and persistent subscriber–stream authorisation record formats, including validation, atomic-write and corruption-recovery behaviour.
 
 ### 2. Publisher ownership

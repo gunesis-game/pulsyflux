@@ -631,6 +631,7 @@ Approval and authentication are separate concerns:
 
 - Approval determines whether a subscriber is permitted to access a stream.
 - Authentication establishes that a subsequent connection possesses the credential associated with the approved Subscriber ID–Stream ID relationship.
+- Each approved Subscriber ID–Stream ID relationship is limited to one active SSE connection at a time. A second simultaneous connection attempt using that relationship's credential receives HTTP `429 Too Many Requests`; the existing connection remains open and unaffected. Once the active connection closes, the credential may be used to establish a new connection.
 
 The exact returning-subscription HTTP exchange and failure responses remain to be specified.
 
@@ -1669,7 +1670,7 @@ Still to specify:
 - Pulsyflux sends `subscription.closed` with `{"code":"not_authorised"}`, flushes the terminal event, and closes each affected connection.
 - A revoked relationship cannot reconnect using its old credential and must go through administrator approval again before a new credential is issued.
 - Revocation does not affect other subscriber–stream relationships, including the same Subscriber ID on other streams.
-- Whether one credential may be used by multiple simultaneous SSE connections.
+
 - The exact pending approval and persistent subscriber–stream authorisation record formats.
 
 ### 2. Publisher ownership

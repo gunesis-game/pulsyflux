@@ -765,7 +765,7 @@ It is a concrete type with no interface, because there is only one implementatio
 
 ## Stream monitor page
 
-`/streams` serves a page that lists every stream and shows each stream's trace live, in chronological order.
+`/streams` serves a page that lists every stream and lets the user select one stream to view its live trace in chronological order.
 
 ### Behaviour
 
@@ -786,11 +786,7 @@ The initial contract has no separate stream-list SSE operation.
 
 #### Stream view
 
-Selecting a card opens its trace from `GET /v1/streams/{streamId}/trace` as a vertical timeline, newest at the bottom, with auto-scroll that pauses when the user scrolls up.
-
-#### Multi-stream view
-
-The page opens one SSE connection per stream from `GET /v1/streams/{streamId}/trace` and merges them into a single timeline, with each event tagged by its stream colour.
+Selecting a card opens only that stream's trace from `GET /v1/streams/{streamId}/trace` as a vertical timeline, newest at the bottom, with auto-scroll that pauses when the user scrolls up. The page maintains one active trace SSE connection for the selected stream; selecting another stream switches the view and connection to that stream.
 
 #### Controls
 

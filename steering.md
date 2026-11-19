@@ -699,6 +699,8 @@ If Tracing disconnects again or detects another unrecoverable authorisation-even
 
 Tracing retries its internal subscription using exponential backoff with a configured maximum delay, avoiding repeated rapid reconnect attempts during a broker outage. A successful reconnection resets the retry delay.
 
+The initial and maximum reconnect delays are deployment-configurable through `trace.reconnectInitialDelay` and `trace.reconnectMaxDelay`.
+
 Producers hand events to it through a bounded queue, configured by `trace.queueSize` and defaulting to 10000 events.
 
 Tracing never blocks a publish or a delivery.

@@ -87,7 +87,7 @@ In-memory only for the first release, bounded by retention limits.
 
 All streams and retained messages are lost when the process exits.
 
-Authentication state is also in-memory only. Pulsyflux does not create authentication, approval, subscriber-record or credential files. Pending requests, approved Application relationships, System credentials, the single Admin credential record, credential hashes and active connections are lost when the process exits.
+Authentication state is also in-memory only. Pulsyflux does not create authentication, approval, subscriber-record or credential files. Pending requests, approved Application relationships, System and Security credentials, the single Admin credential record, credential hashes and active connections are lost when the process exits.
 
 Durable storage for streams and messages is out of scope unless separately specified.
 
@@ -133,6 +133,10 @@ Authentication is built into Pulsyflux and uses one shared in-memory credential 
 Every subscriber presents a bearer token. Pulsyflux hashes it, finds the matching in-memory credential record, validates it and obtains the subscriber identity, role and stream scope. Authentication identifies the subscriber; authorisation checks the record's role and scope against the requested operation. A client cannot choose or elevate its own role.
 
 The credential store contains hashes, not plaintext tokens. Application, System and Security records are scoped to their relevant subscriber–stream relationship. The Admin record is global and has no stream scope.
+
+At startup, before the Security subscriber starts, the core generates a fresh 256-bit random bearer credential for its reserved Security identity. It seeds the shared in-memory credential store with the credential hash and the trusted Security identity, role and scope. The core passes the plaintext credential directly to the Security subscriber through a private in-memory startup handoff; the credential is not exposed through an API, event, log, trace or external interface. The handoff is one-time and is not a second subscription or publishing path.
+
+The Security subscriber then authenticates and subscribes through the ordinary bearer-token verification and subscription mechanism. It publishes through the ordinary publishing mechanism. The core's generic credential verification resolves the seeded Security record without asking the Security subscriber to authorise its own authentication or subscription. This is the minimal bootstrap trust check; it does not create a separate messaging mechanism or allow a client to select the Security role.
 
 Exactly one Admin credential record must exist in every running instance. Pulsyflux creates it at startup from the required `PULSYFLUX_ADMIN_TOKEN` environment variable. The token must contain at least 256 bits of cryptographically secure randomness. Pulsyflux hashes it and does not retain the plaintext. If the variable is missing or empty, Pulsyflux must fail startup. The Admin record cannot be requested, approved, duplicated or revoked through subscriber workflows. Changing the token requires restarting Pulsyflux.
 
@@ -1261,7 +1265,7 @@ To prevent recursive authentication, the core recognises the trusted, startup-pr
 
 The following details remain open for design discussion:
 
-- The exact internal identity representation and bootstrap/provisioning mechanism by which the core recognises the Security subscriber.
+- The exact internal identity representation and bootstrap/provisioning mechanism beyond the settled startup credential handoff.
 - The Security subscriber's precise event subscriptions and which authentication decisions are made by it versus enforced by the core.
 - The Tracing subscriber's exact event subscriptions and metadata access boundaries, especially ensuring that message payloads and credentials are never traced.
 - The lifecycle and failure behaviour of either internal subscriber after startup.
@@ -1279,7 +1283,7 @@ The following points are settled by this steering file and are not open decision
 - Application subscribers are external subscribers approved independently for each Subscriber ID + Stream ID relationship.
 - System subscribers are Pulsyflux-managed internal subscribers to a stream; external clients cannot claim the System role.
 - Security is a reserved internal role for the authentication and authorisation subscriber. Its identity and credential are provisioned by Pulsyflux at startup; external clients cannot request or claim it.
-- The Security subscriber uses the same subscription and publishing mechanisms as other subscribers. The core locally recognises its trusted, startup-provisioned identity for its own role check, avoiding recursive delegation to Security without creating a separate messaging path.
+- The Security subscriber uses the same subscription and publishing mechanisms as other subscribers. At startup, the core generates its 256-bit bearer credential, stores only its hash and trusted identity/role/scope record in the shared in-memory credential store, and hands the plaintext credential to the subscriber through a private, one-time in-memory handoff. The subscriber then uses ordinary bearer-token verification, subscription and publishing. The core's generic verifier resolves this pre-seeded Security record locally, so Security is not asked to authorise its own authentication or subscription and no separate messaging path is created.
 - Admin is a global role, not scoped to a stream.
 - Exactly one Admin credential record exists in memory in every running Pulsyflux instance.
 - `PULSYFLUX_ADMIN_TOKEN` is mandatory. If it is missing or empty, Pulsyflux fails startup.
@@ -1294,7 +1298,7 @@ The following points are settled by this steering file and are not open decision
 - Pending Application subscriptions can remain connected through SSE while awaiting approval, for a maximum of 10 minutes.
 - An approved pending subscription proceeds on its existing SSE connection.
 - Rejection and timeout use the same generic terminal event and do not reveal the administrator's decision.
-- Pulsyflux generates 256-bit random bearer credentials for Application, System and Security subscribers using Go's `crypto/rand`, encoded as unpadded Base64 URL-safe text.
+- Pulsyflux generates 256-bit random bearer credentials for Application, System and Security subscribers using Go's `crypto/rand`, encoded as unpadded Base64 URL-safe text. For Security, the core generates the credential before the subscriber starts, seeds its hash and trusted role record in the shared in-memory credential store, and hands the plaintext credential to the subscriber through a private, one-time in-memory startup handoff.
 - Only SHA-256 credential digests are stored in memory; presented tokens are hashed and digest comparisons use a constant-time comparison.
 - Credentials are bound to their assigned subscriber identity, role and stream scope.
 - Credentials are delivered once, never placed in URLs, and excluded from traces, ordinary logs, errors and the administration interface.

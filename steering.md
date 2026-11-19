@@ -569,6 +569,20 @@ The plaintext credential exists only as needed to deliver it to the approved sub
 
 The subscriber application is responsible for securely retaining its credential. The exact subscriber-side storage expectations remain to be specified.
 
+### Credential recovery and replacement
+
+**Settled decisions:**
+
+- Credential replacement can be initiated in either of two ways:
+  - A subscriber can request recovery for its existing Subscriber ID–Stream ID relationship. An authenticated administrator must approve the request before a replacement credential is issued.
+  - An authenticated administrator can initiate credential replacement directly, without a preceding subscriber recovery request.
+- Knowing or presenting a Subscriber ID and Stream ID is not sufficient authority to replace a credential. A subscriber-initiated recovery request must be approved by an authenticated administrator.
+- After the replacement is authorised, Pulsyflux generates a new credential using the established credential-generation rules and delivers it through the pending SSE connection using the dedicated `pulsyflux.credential` event.
+- The recovery SSE connection may remain open for up to 10 minutes while the recovery request awaits administrator action or completion. If the recovery is not authorised and completed within that period, Pulsyflux closes the connection without disclosing the administrator's decision.
+- If recovery times out before a replacement is issued, the existing credential remains valid and existing authenticated connections are not affected.
+- When a replacement credential is issued, the previous credential is invalidated immediately, with no overlap. All existing SSE connections authenticated with the replaced credential are closed immediately.
+- The subscriber must retain the replacement credential securely and use it for subsequent connections.
+
 ### Subsequent subscriptions
 
 A subscriber that has already been approved should not need to repeat the complete administrator approval process every time it subscribes to the same stream.
@@ -1612,12 +1626,10 @@ Still to specify:
 - Exact behaviour when a subscriber changes its Name, including how concurrent requests update the displayed value.
 - Browser clients that cannot set an `Authorization` header through native `EventSource` use `fetch()` streaming and an SSE parser; no cookie-based or URL-based credential alternative is supported.
 - Secure storage expectations for the credential at the subscriber.
-- The exact workflow for requesting, authorising and delivering a replacement credential, including recovery when the initial `pulsyflux.credential` event is missed and behaviour of existing SSE connections during replacement.
 - The exact timeout HTTP response and SSE connection-closing sequence.
 - Existing SSE connection behaviour after revocation.
 - Whether one credential may be used by multiple simultaneous SSE connections.
 - The exact pending approval and persistent subscriber–stream authorisation record formats.
-- Interrupted enrolment and safe recovery if the initial credential-delivery event is missed.
 
 ### 2. Publisher ownership
 
@@ -1707,6 +1719,10 @@ The following points are settled by this steering file and are not open decision
 - Each credential contains 256 bits of cryptographically secure randomness and is encoded as unpadded Base64 URL-safe text.
 - Pulsyflux stores only the credential's SHA-256 digest and validates it using a constant-time comparison.
 - Replacing a credential immediately invalidates the previous credential.
+- Credential recovery can be initiated by the subscriber (with administrator approval) or directly by an authenticated administrator.
+- A Subscriber ID and Stream ID alone cannot authorise credential replacement.
+- Credential recovery has a 10-minute maximum waiting period.
+- Issuing a replacement credential immediately closes all existing SSE connections authenticated with the replaced credential.
 - Authentication is programming-language independent and uses documented HTTP and SSE interfaces.
 - A Go client library may be provided, but it is optional and never mandatory.
 - Authentication and authorisation are scoped to a subscriber–stream relationship.

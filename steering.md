@@ -152,7 +152,7 @@ An authenticated Admin may revoke any approved Application Subscriber ID + Strea
 
 Subscriber IDs are normalised to lowercase. Names are required, trimmed, limited to 64 Unicode characters and rejected if they contain control characters. For an approved relationship, a Name update requires its valid bearer credential. A repeat pending request updates the existing Name without creating a duplicate or resetting the original 10-minute deadline. Concurrent updates are serialised per stream; the last processed update wins.
 
-All authentication and authorisation state is in memory only: pending requests, Application, System and Security credential hashes, the single Admin record, role/scope records, active connections and revocation state. Pulsyflux creates, reads and writes no authentication-related files. On process exit, all this state disappears. On restart, Pulsyflux recreates exactly one Admin record from the environment variable; Application subscribers must request approval again and System subscribers are recreated internally.
+All authentication and authorisation state is in memory only: pending requests, Application, System and Security credential hashes, the single Admin record, role/scope records, active connections and revocation state. Pulsyflux creates, reads and writes no authentication-related files. On process exit, all this state disappears. On restart, Pulsyflux recreates exactly one Admin record from the environment variable; Application subscribers must request approval again, and System and Security subscribers are recreated internally.
 
 Authentication is programming-language independent and uses documented HTTP and SSE interfaces. A Go client library is optional and never required.
 
@@ -827,7 +827,7 @@ Pulsyflux provides an HTML administration page for reviewing and managing Applic
 
 #### Authentication
 
-The page authenticates as the single global Admin subscriber. The administrator enters the token configured through `PULSYFLUX_ADMIN_TOKEN`; the page presents it as a bearer credential and Pulsyflux validates it using the same token hashing, in-memory lookup and role resolution used for Application and System subscribers.
+The page authenticates as the single global Admin subscriber. The administrator enters the token configured through `PULSYFLUX_ADMIN_TOKEN`; the page presents it as a bearer credential and Pulsyflux validates it using the same token hashing, in-memory lookup and role resolution used for Application, System and Security subscribers.
 
 There is no separate administrator login protocol, username, password, browser session or special authentication bypass. The page keeps the bearer token in memory only and must not place it in URLs, persistent browser storage, page scripts, logs or traces. The token is not returned by any API.
 
@@ -1294,7 +1294,7 @@ The following points are settled by this steering file and are not open decision
 - Pending Application subscriptions can remain connected through SSE while awaiting approval, for a maximum of 10 minutes.
 - An approved pending subscription proceeds on its existing SSE connection.
 - Rejection and timeout use the same generic terminal event and do not reveal the administrator's decision.
-- Pulsyflux generates 256-bit random bearer credentials for Application and System subscribers using Go's `crypto/rand`, encoded as unpadded Base64 URL-safe text.
+- Pulsyflux generates 256-bit random bearer credentials for Application, System and Security subscribers using Go's `crypto/rand`, encoded as unpadded Base64 URL-safe text.
 - Only SHA-256 credential digests are stored in memory; presented tokens are hashed and digest comparisons use a constant-time comparison.
 - Credentials are bound to their assigned subscriber identity, role and stream scope.
 - Credentials are delivered once, never placed in URLs, and excluded from traces, ordinary logs, errors and the administration interface.

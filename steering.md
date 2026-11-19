@@ -1556,16 +1556,20 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 
 Settle these in this `steering.md` before implementation.
 
-### 1. Authentication protocol details
+### 1. Authentication and authorisation protocol
 
 Settled:
 
-- Authentication is built into Pulsyflux.
-- Authentication is an internal subscriber, following the general subscriber model used by tracing.
-- Applications already exist independently of Pulsyflux.
-- Pulsyflux does not create applications or introduce an application-registration workflow.
-- An application requests access by attempting to subscribe to a stream.
-- There is no separate application registration-request workflow.
+- Authentication is built into Pulsyflux; there is no separate authentication service or process.
+- Authentication is an internal subscriber, following the general internal subscriber model used by tracing.
+- Applications exist independently of Pulsyflux. The identity of the application making a subscription is irrelevant to authentication and authorisation.
+- A subscriber requests access by attempting to subscribe to a stream.
+- Authentication and authorisation are scoped to the subscriber–stream relationship. There is no application identity, application registration, or application-wide credential.
+- Approval for one stream does not grant access to another stream.
+- Subscriber applications do not generate key pairs and do not need to implement authentication modules or their own cryptographic operations.
+- Ed25519 is the approved asymmetric signing algorithm.
+- When an administrator approves a subscriber for a stream, Pulsyflux generates an Ed25519 key pair for that subscriber–stream relationship, provides the private key to the subscriber, and retains the corresponding public key.
+- The subscriber application can store the private key for use when returning to that same stream.
 - Pending subscriber approvals are maintained in separate per-stream files on disk.
 - An administrator authenticates through a local HTML administration page.
 - The administrator selects streams and reviews pending subscribers for each stream.
@@ -1575,43 +1579,30 @@ Settled:
 - An approved pending subscription proceeds on its existing SSE connection.
 - An unsuccessful subscription is closed without revealing the administrator's decision.
 - Pulsyflux records the decision internally.
-- Subsequent subscriptions should not require the complete approval process every time.
-- Pulsyflux manages application authentication and credential security.
-- Pulsyflux does not create applications or issue application credentials as part of an application-registration process.
-- Application authorisation is per application, per stream.
-- Approval for one stream does not grant access to another stream.
-- Approved application–stream authorisations are stored persistently and survive a process restart.
-- Previously approved applications are automatically authorised when they request access to the same stream again, provided they authenticate as the previously approved application.
-- New application–stream combinations require administrator approval.
+- Subsequent subscriptions should not require the complete administrator approval process every time. A returning subscriber must authenticate for the requested stream using the credential provisioned for that subscriber–stream relationship.
+- Approved subscriber–stream authorisations are stored persistently and survive a process restart.
 - A Go client library is optional; authentication must work through documented HTTP and SSE interfaces.
 - SSE replay uses the `Last-Event-ID` HTTP header only. There is no `lastEventId` query parameter.
 
 Still to specify:
 
-- **Settled decision:** Ed25519 is the asymmetric signing algorithm for application authentication. The application's Ed25519 public-key fingerprint is its stable identity.
-- Proof-of-possession protocol.
-- Challenge freshness and replay protection.
-- Credential format.
-- Secure credential provisioning and storage mechanism.
-- How credentials are made available to independently existing applications without introducing application creation or application registration.
-- Authentication request format for subsequent subscriptions.
-- How proof of possession is performed on subsequent connections.
-- How the service protects against replay and impersonation attempts.
+- Exactly how the subscriber's stored private key is used on a returning subscription.
+- Where signing takes place, given that subscriber applications do not implement authentication modules or cryptographic operations.
+- How the private key is presented or made available to Pulsyflux for returning subscriptions, without assuming an additional HTTP endpoint or a bidirectional SSE channel.
+- How the returning-subscriber authentication exchange fits into the existing SSE subscription flow. SSE is server-to-client; the design must identify how any subscriber response reaches Pulsyflux using the existing interface.
+- Challenge freshness and replay protection, if the agreed exchange uses a challenge.
+- Credential format and the exact way the private key is delivered to the subscriber during administrator approval.
+- Secure storage expectations for the private key at the subscriber.
 - The exact timeout HTTP response and SSE connection-closing sequence.
 - Existing SSE connection behaviour after revocation.
 - Key rotation and compromised-key recovery.
+- The exact pending approval and persistent subscriber–stream authorisation record formats.
 
-### 2. Application and OS-user identity
-
-Specify how applications are distinguished from one another and how applications running under different operating-system users are represented and isolated.
-
-Application identity is the SHA-256 fingerprint of the application's cryptographic public key. The implementation must prevent one local application from impersonating another previously approved application. Operating-system-user isolation and the limits of credential isolation between applications running as the same OS user remain to be specified.
-
-### 3. Publisher ownership
+### 2. Publisher ownership
 
 Define the remaining ownership responsibilities of a publisher when admission and revocation are controlled by the central authentication component.
 
-### 4. Administrator identity and access
+### 3. Administrator identity and access
 
 Specify:
 
@@ -1625,34 +1616,32 @@ Specify:
 
 The administrator interface must not allow an ordinary local application to approve subscriptions or revoke credentials.
 
-### 5. Pending approval storage
+### 4. Pending approval storage
 
 Specify:
 
 - The exact pending subscriber record fields.
 - How pending records are added, updated and removed.
-- How concurrent subscription attempts for the same application and stream are handled.
+- How concurrent subscription attempts for the same subscriber and stream are handled.
 - How approval files are updated atomically.
 - How incomplete or corrupted files are handled.
 - How pending records are reconciled with subscriptions after a process restart.
 - How expired pending records are cleaned up.
-- The exact format and storage arrangement for persistent approved application–stream authorisation records.
+- The exact format and storage arrangement for persistent approved subscriber–stream authorisation records.
 
 The per-stream pending approval file approach is settled. Its exact record format and implementation details remain open.
 
-Persistent application–stream authorisation is settled. Its exact record format and implementation details remain open.
+Persistent subscriber–stream authorisation is settled. Its exact record format and implementation details remain open.
 
-### 6. Subsequent subscriptions
+### 5. Subsequent subscriptions
 
-Specify the authentication mechanism that allows previously approved applications to subscribe again without repeating the complete authentication and administrator approval process.
+Specify the returning-subscriber authentication mechanism. It must authenticate the subscriber for the requested stream using the credential provisioned for that subscriber–stream relationship, without requiring the administrator approval process again.
 
-The mechanism must provide secure application identification and proof of possession without requiring application developers to implement their own cryptographic security modules.
+The mechanism must not require subscriber applications to generate keys or implement their own cryptographic authentication module.
 
-Authorisation must be checked for the specific application–stream combination.
+Authorisation must be checked for the specific subscriber–stream relationship. An approval for one stream must never be interpreted as approval for every stream.
 
-An approval for one stream must never be interpreted as approval for every stream.
-
-### 7. Process model
+### 6. Process model
 
 Settled: The first-release installers configure and start Pulsyflux as a managed operating-system service.
 
@@ -1668,7 +1657,7 @@ The following points are settled by this steering file and are not open decision
 
 - First-release stream and message storage is in-memory and is lost on process exit.
 - Authentication pending approval records are stored on local disk, separately for each stream.
-- Approved application–stream authorisation records are persistent and survive process restarts.
+- Approved subscriber–stream authorisation records are persistent and survive process restarts.
 - Streams use fan-out pub/sub (every subscriber receives every message) with replay, not competing-consumer queue semantics.
 - The stream ID hashes the complete schema document, including annotations such as `title`, `description` and `examples`.
 - The service is loopback-only and is not reachable from the LAN.
@@ -1678,10 +1667,9 @@ The following points are settled by this steering file and are not open decision
 - There is no public stream-clear or stream-delete operation in the first release.
 - Authentication is built into Pulsyflux; there is no separate authentication service or process.
 - Authentication is an internal subscriber, following the general internal subscriber model used by tracing.
-- Applications exist independently of Pulsyflux.
-- Pulsyflux does not create applications or introduce an application-registration workflow.
-- Applications request stream access by attempting to subscribe.
-- There is no separate application registration-request workflow.
+- Applications exist independently of Pulsyflux; application identity is irrelevant to subscriber authentication and authorisation.
+- Subscribers request stream access by attempting to subscribe.
+- There is no application registration or application registration-request workflow.
 - Subscriber approval is required before message events can flow.
 - Pending subscriptions can remain connected through SSE while awaiting administrator approval.
 - The maximum approval waiting period is 10 minutes.
@@ -1691,15 +1679,15 @@ The following points are settled by this steering file and are not open decision
 - Each stream has its own pending subscriber approval file on local disk.
 - The administrator authenticates through a local HTML administration page.
 - An authenticated administrator can select streams and review their pending subscribers independently.
-- Subsequent subscriptions should not require the complete approval process every time.
-- Pulsyflux manages application authentication and credential security.
-- Pulsyflux does not issue application credentials as part of creating or registering an application.
-- Subscriber applications do not need to implement their own cryptographic security modules.
+- Subsequent subscriptions should not require the complete administrator approval process every time.
+- Pulsyflux manages subscriber authentication and credential security.
+- Subscriber applications do not generate key pairs or implement their own authentication or cryptographic operations.
+- Pulsyflux generates an Ed25519 key pair for each approved subscriber–stream relationship, provides the private key to the subscriber, and retains the corresponding public key.
 - Authentication is programming-language independent and uses documented HTTP and SSE interfaces.
 - A Go client library may be provided, but it is optional and never mandatory.
-- Authorisation is per application, per stream.
+- Authentication and authorisation are scoped to a subscriber–stream relationship.
 - Approval for one stream does not grant access to another stream.
-- Previously approved application–stream combinations are automatically recognised on subsequent subscriptions.
-- New application–stream combinations require administrator approval.
+- Previously approved subscriber–stream relationships are recognised on subsequent subscriptions using their stream-specific credentials.
+- New subscriber–stream relationships require administrator approval.
 - SSE replay uses the standard `Last-Event-ID` HTTP header only.
 - No `?lastEventId=` query parameter or alternative query-based replay mechanism is supported.

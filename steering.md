@@ -363,6 +363,8 @@ The initial setup flow is available only while the administrator credential file
 
 Administrator passwords are hashed using Argon2id with a unique cryptographically random salt for each password. The stored password hash representation includes the algorithm version, parameters, salt and derived hash so that verification is reproducible and parameters can be changed in the future. Plaintext passwords are never written to the credential file.
 
+Pulsyflux supports exactly one administrator account. The initial setup creates this single account; there is no multi-administrator account management in the first release.
+
 
 Subscriber applications exist independently of Pulsyflux. Pulsyflux does not create subscriber applications or introduce a subscriber-registration workflow.
 
@@ -1695,7 +1697,6 @@ Specify:
 - The administrator authentication mechanism.
 - How administrator sessions are maintained and expired.
 - How administrator approval actions are protected.
-- Whether multiple administrators are supported.
 - How administrator credentials can be changed or recovered.
 
 The administrator interface must not allow an ordinary local subscriber application to approve subscriptions or revoke credentials.

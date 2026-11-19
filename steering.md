@@ -1269,15 +1269,13 @@ The following details remain open for design discussion:
 - The exact event schemas, ordering, delivery guarantees and failure handling for Security's authentication and authorisation event subscriptions.
 - The Tracing subscriber's exact event subscriptions and metadata access boundaries, especially ensuring that message payloads and credentials are never traced.
 - The Tracing subscriber's lifecycle and failure behaviour after startup.
-- Security recovery retry policy after repeated crashes: whether to retry automatically with increasing delays (and what limits/backoff policy to use) or stop and require administrator intervention.
+- The exact Security recovery backoff parameters, including the initial delay, multiplier, maximum delay and whether jitter is used.
 
 Do not implement until the remaining design details have been discussed and the steering file has been updated.
 
 ## Next-session handoff
 
-Continue the architecture discussion; do not implement yet. The latest agreed topic is the internal `Security` subscriber. The next decision to discuss is its recovery retry policy after repeated crashes. The current recommendation is automatic retries with increasing delays (backoff), while keeping the core fail-closed until Security has successfully re-authenticated with its existing reserved credential, re-subscribed through the ordinary subscription mechanism, and resumed processing its subscribed events. Ask the user to confirm or adjust this recommendation before recording it as settled.
-
-After that, continue with the remaining open Security event contract details (schemas, ordering, delivery guarantees and failure handling), then design the Tracing subscriber's event subscriptions, metadata boundaries and lifecycle/failure behaviour. Preserve the agreed rule that all internal subscribers use the same subscription and publishing mechanisms; the Security role's trusted bootstrap is the narrowly scoped exception for establishing its own identity, not a separate messaging path.
+Continue the architecture discussion; do not implement yet. Automatic Security recovery using exponential backoff is now settled. The next topic is the Security event contract: schemas, ordering, delivery guarantees and failure handling. After that, design the Tracing subscriber's event subscriptions, metadata boundaries and lifecycle/failure behaviour. The exact numerical parameters for Security's exponential backoff remain open for later specification. Preserve the agreed rule that all internal subscribers use the same subscription and publishing mechanisms; the Security role's trusted bootstrap is the narrowly scoped exception for establishing its own identity, not a separate messaging path.
 
 ## Settled decisions
 
@@ -1295,6 +1293,7 @@ The following points are settled by this steering file and are not open decision
 - Security subscribes to events for new subscription attempts, reconnection attempts, Application approval and rejection outcomes, credential revocations, and subscriber identity or permission changes. These events provide Security with the workflow context needed for its policy decisions. Event payloads must not contain bearer credentials, credential hashes or message content; event schemas, ordering, delivery guarantees and failure handling remain to be designed.
 - Security unavailability is handled fail-closed. While Security is unavailable, the core must not grant or authorise new subscriptions or reconnections, and must not process permission-changing decisions or updates without Security's policy decision. Existing authorised connections may continue only under their already-established permissions for the remainder of their existing connection lifecycle; this does not authorise a new connection or reconnection.
 - After a Security outage, the Security subscriber recovers by re-authenticating with its existing reserved credential and re-subscribing through the ordinary subscription mechanism. It resumes processing its subscribed events before the core authorises new subscriptions, reconnections or permission changes. The core continues to enforce the fail-closed policy until Security has successfully resumed.
+- If the Security subscriber crashes or becomes unavailable, Pulsyflux retries its recovery automatically using exponential backoff (increasing delays between unsuccessful attempts). Retries continue without administrator intervention. The core remains fail-closed throughout recovery and does not bypass Security after repeated failures. Normal authorisation resumes only after Security has re-authenticated with its existing reserved credential, re-subscribed through the ordinary subscription mechanism and resumed processing its subscribed events. The exact backoff parameters remain to be specified.
 - Admin is a global role, not scoped to a stream.
 - Exactly one Admin credential record exists in memory in every running Pulsyflux instance.
 - `PULSYFLUX_ADMIN_TOKEN` is mandatory. If it is missing or empty, Pulsyflux fails startup.

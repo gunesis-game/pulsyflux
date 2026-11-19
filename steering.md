@@ -163,8 +163,6 @@ Authentication is programming-language independent and uses documented HTTP and 
 
 ## Why a custom generator
 
-## Why a custom generator
-
 `lerenn/asyncapi-codegen` is the main Go AsyncAPI generator. It supports AsyncAPI 2.6.0 and 3.0.0, not 3.1.0. It generates broker controllers for Kafka and NATS, and does not generate an HTTP or SSE server.
 
 No AsyncAPI renderer offers a Swagger-style "Try it out". The console has to be generated from the same contract to avoid drift.

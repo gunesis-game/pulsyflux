@@ -476,7 +476,7 @@ Returns readiness and stream/subscriber counts.
 
 ### Authentication and administration operations
 
-Authentication uses a single bearer-credential mechanism and in-memory credential store for the `Application`, `System` and `Admin` roles. The contract must define subscriber identity fields, credential issuance and presentation, and role-based authorisation behaviour.
+Authentication uses a single bearer-credential mechanism and in-memory credential store for all four roles: `Application`, `System`, `Security` and `Admin`. `Security` is reserved and internally provisioned by Pulsyflux; external subscribers cannot request or claim it. The contract must define subscriber identity fields, credential issuance and presentation, and role-based authorisation behaviour.
 
 Administration operations must cover:
 - Discovering available streams using the global Admin credential.

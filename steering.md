@@ -1255,7 +1255,7 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 Pulsyflux has two internal subscribers in the initial design:
 
 1. **Tracing** — an internal `System` subscriber responsible for consuming trace-relevant events and writing trace records.
-2. **Authentication & Authorisation** — an internal `Security` subscriber responsible for authentication and authorisation workflows, including credential lookup, role resolution, pending Application approvals and revocation.
+2. **Authentication & Authorisation** — an internal `Security` subscriber responsible for authentication and authorisation policy decisions, including Application approval, rejection and revocation decisions.
 
 Both participate through the same subscription and publishing mechanisms used by other subscribers. Neither is a separate service or an alternative messaging path.
 
@@ -1266,7 +1266,7 @@ To prevent recursive authentication, the core recognises the trusted, startup-pr
 The following details remain open for design discussion:
 
 - The exact internal identity representation and bootstrap/provisioning mechanism beyond the settled startup credential handoff.
-- The Security subscriber's precise event subscriptions and which authentication decisions are made by it versus enforced by the core.
+- The Security subscriber's precise event subscriptions and event contracts for authentication and authorisation workflows.
 - The Tracing subscriber's exact event subscriptions and metadata access boundaries, especially ensuring that message payloads and credentials are never traced.
 - The lifecycle and failure behaviour of either internal subscriber after startup.
 
@@ -1284,6 +1284,7 @@ The following points are settled by this steering file and are not open decision
 - System subscribers are Pulsyflux-managed internal subscribers to a stream; external clients cannot claim the System role.
 - Security is a reserved internal role for the authentication and authorisation subscriber. Its identity and credential are provisioned by Pulsyflux at startup; external clients cannot request or claim it.
 - The Security subscriber uses the same subscription and publishing mechanisms as other subscribers. At startup, the core generates its 256-bit bearer credential, stores only its hash and trusted identity/role/scope record in the shared in-memory credential store, and hands the plaintext credential to the subscriber through a private, one-time in-memory handoff. The subscriber then uses ordinary bearer-token verification, subscription and publishing. The core's generic verifier resolves this pre-seeded Security record locally, so Security is not asked to authorise its own authentication or subscription and no separate messaging path is created.
+- The Security subscriber owns authentication and authorisation policy decisions: it receives relevant workflow events and decides whether Application access is pending, approved, rejected or revoked, and determines the permitted role and stream scope. The core owns foundational credential verification and enforcement: it verifies bearer credentials against the shared in-memory store, enforces the identity, role and scope on operations, manages pending and active SSE connections, enforces timeouts and connection limits, and performs the minimal bootstrap trust check for Security itself. The core does not delegate Security's own authentication or subscription authorisation back to Security.
 - Admin is a global role, not scoped to a stream.
 - Exactly one Admin credential record exists in memory in every running Pulsyflux instance.
 - `PULSYFLUX_ADMIN_TOKEN` is mandatory. If it is missing or empty, Pulsyflux fails startup.

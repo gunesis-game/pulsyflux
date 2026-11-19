@@ -569,7 +569,6 @@ Use the established file terminology precisely:
 - The stream file stores only the SHA-256 digest of that credential. It never stores the plaintext bearer credential or a reversible representation of it.
 - A presented bearer credential is hashed and checked against the stored digest using a constant-time comparison. The stored digest itself is not accepted as a bearer credential.
 - Because the credential is uniformly random with 256 bits of entropy, possession of its SHA-256 digest does not make recovering the bearer credential computationally feasible.
-- Do not derive bearer credentials or authentication keys from the stream file's checksum. A checksum of a stolen file is reproducible by whoever possesses that file and does not provide secret material.
 - No separate persistent encryption key is required to meet this authentication-protection requirement.
 
 This decision addresses theft or copying of the stream file only. Detection or prevention of unauthorised modifications to the file is a separate tamper-protection concern and is not settled by this decision.

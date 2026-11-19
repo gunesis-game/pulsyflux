@@ -357,7 +357,7 @@ Subscriber applications exist independently of Pulsyflux. Pulsyflux does not cre
 
 A subscriber requests access by attempting to subscribe to a stream and supplying its stable Subscriber ID and descriptive Name. Pulsyflux authorises access using the bearer credential associated with the specific subscriber–stream relationship.
 
-Pulsyflux generates and manages the random bearer credential for an approved subscriber–stream relationship. The exact credential provisioning, delivery, storage and returning-request format remain to be specified.
+Pulsyflux generates and manages the random bearer credential for an approved subscriber–stream relationship. After approval, Pulsyflux delivers the credential on the existing pending SSE connection using the dedicated `pulsyflux.credential` event, with a JSON `credential` field. Returning subscriptions present the credential only in the HTTP `Authorization: Bearer <credential>` header; credentials must not be placed in URLs or query parameters.
 
 ### Authentication architecture
 
@@ -1567,6 +1567,7 @@ Settled:
 - Pulsyflux generates a random bearer credential for each approved subscriber–stream relationship.
 - After approval, Pulsyflux delivers the credential on the existing pending SSE connection using the dedicated `pulsyflux.credential` event, with a JSON `credential` field.
 - A bearer credential is specific to exactly one Subscriber ID and Stream ID.
+- Returning subscriptions present the bearer credential only through the HTTP `Authorization: Bearer <credential>` header; credentials are never placed in URLs or query parameters.
 - Pulsyflux manages credential generation, validation, storage and revocation.
 - Pending subscriber approvals are maintained in separate per-stream files on disk.
 - An administrator authenticates through a local HTML administration page.
@@ -1577,7 +1578,7 @@ Settled:
 - An approved pending subscription proceeds on its existing SSE connection.
 - An unsuccessful subscription is closed without revealing the administrator's decision.
 - Pulsyflux records the decision internally.
-- Subsequent subscriptions should not require the complete administrator approval process every time. A returning subscriber must present the bearer credential provisioned for that subscriber–stream relationship.
+- Subsequent subscriptions should not require the complete administrator approval process every time. A returning subscriber must present the bearer credential provisioned for that subscriber–stream relationship, exclusively in the HTTP `Authorization: Bearer <credential>` header.
 - Approved subscriber–stream authorisations are stored persistently and survive a process restart.
 - A Go client library is optional; authentication must work through documented HTTP and SSE interfaces.
 - SSE replay uses the `Last-Event-ID` HTTP header only. There is no `lastEventId` query parameter.
@@ -1588,7 +1589,7 @@ Still to specify:
 - Exact behaviour when a subscriber changes its Name, including how concurrent requests update the displayed value.
 - Exact credential entropy, random-generation requirements, encoding and wire format.
 - Whether Pulsyflux stores a one-way hash of the bearer credential and the exact hash/storage format.
-- The exact returning-subscription request format and how the bearer credential is presented.
+- Browser clients that cannot set an `Authorization` header through native `EventSource` use `fetch()` streaming and an SSE parser; no cookie-based or URL-based credential alternative is supported.
 - Secure storage expectations for the credential at the subscriber.
 - Credential rotation, replacement and compromised-credential recovery.
 - The exact timeout HTTP response and SSE connection-closing sequence.

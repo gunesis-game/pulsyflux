@@ -1265,12 +1265,19 @@ To prevent recursive authentication, the core recognises the trusted, startup-pr
 
 The following details remain open for design discussion:
 
-- The exact internal identity representation and bootstrap/provisioning mechanism beyond the settled startup credential handoff.
+- The exact internal identity representation beyond the settled trusted startup credential provisioning and one-time handoff.
 - The exact event schemas, ordering, delivery guarantees and failure handling for Security's authentication and authorisation event subscriptions.
 - The Tracing subscriber's exact event subscriptions and metadata access boundaries, especially ensuring that message payloads and credentials are never traced.
 - The Tracing subscriber's lifecycle and failure behaviour after startup.
+- Security recovery retry policy after repeated crashes: whether to retry automatically with increasing delays (and what limits/backoff policy to use) or stop and require administrator intervention.
 
 Do not implement until the remaining design details have been discussed and the steering file has been updated.
+
+## Next-session handoff
+
+Continue the architecture discussion; do not implement yet. The latest agreed topic is the internal `Security` subscriber. The next decision to discuss is its recovery retry policy after repeated crashes. The current recommendation is automatic retries with increasing delays (backoff), while keeping the core fail-closed until Security has successfully re-authenticated with its existing reserved credential, re-subscribed through the ordinary subscription mechanism, and resumed processing its subscribed events. Ask the user to confirm or adjust this recommendation before recording it as settled.
+
+After that, continue with the remaining open Security event contract details (schemas, ordering, delivery guarantees and failure handling), then design the Tracing subscriber's event subscriptions, metadata boundaries and lifecycle/failure behaviour. Preserve the agreed rule that all internal subscribers use the same subscription and publishing mechanisms; the Security role's trusted bootstrap is the narrowly scoped exception for establishing its own identity, not a separate messaging path.
 
 ## Settled decisions
 

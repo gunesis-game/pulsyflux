@@ -691,6 +691,8 @@ On process shutdown, the recorder stops accepting new trace events, drains its q
 
 Tracing's internal subscriber automatically reconnects after a disconnect or crash using its reserved, startup-provisioned System identity and credential. It resubscribes through the ordinary subscription mechanism and replays retained authorisation events through the normal SSE replay mechanism. If required events have been evicted, the ordinary `stream.gap` mechanism exposes the missing range. Tracing recovery does not block Security or the core, and Tracing receives no special broker privileges or unlimited queue.
 
+When Tracing receives a `stream.gap` for its internal authorisation-event subscription, it records an explicit diagnostic in its own trace history identifying the affected source stream and missing sequence range. Tracing does not fabricate missing authorisation events or infer Security decisions. The gap places Tracing's health status in a degraded state until the gap is acknowledged or otherwise resolved operationally.
+
 Producers hand events to it through a bounded queue, configured by `trace.queueSize` and defaulting to 10000 events.
 
 Tracing never blocks a publish or a delivery.

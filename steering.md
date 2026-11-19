@@ -1241,9 +1241,26 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 
 ## Open decisions
 
-No authentication or authorisation decisions remain open. The three-role model, unified credential verification, global single Admin record and mandatory startup token are settled in this steering file.
+### Next discussion: System subscribers
 
-Other implementation details must follow these decisions and must not introduce a separate administrator authentication mechanism.
+The next design discussion is to define the two internal System subscribers. The current proposal identifies exactly two:
+
+1. **Tracing** — the internal subscriber responsible for consuming trace-relevant events and writing trace records.
+2. **Authentication & Authorisation** — the internal subscriber responsible for the authentication and authorisation workflow, including credential lookup, role resolution, pending Application approvals and revocation.
+
+These are internal System subscribers, not additional subscriber roles. The existing three roles remain `Application`, `System` and `Admin`. In particular, the Authentication & Authorisation System subscriber must not be confused with the global `Admin` role it manages.
+
+This topic is deliberately not yet settled. Discuss and decide:
+
+- Whether these are exactly two System subscriber instances, created and managed by Pulsyflux at startup.
+- Their identities, responsibilities, event subscriptions and lifecycle.
+- Whether the Authentication & Authorisation subscriber owns the in-memory credential store and is trusted directly by the core, or whether it must itself authenticate through that store.
+- How the core and other components interact with these subscribers without creating circular authentication dependencies.
+- The Tracing subscriber's access boundaries, especially ensuring that message payloads and credentials are never traced.
+
+Do not assume answers to these questions or implement a design until this discussion has settled them.
+
+The three-role model, unified credential verification, global single Admin record and mandatory startup token remain settled decisions. This next discussion concerns the two internal System subscribers and their architecture, not a change to the role model.
 
 ## Settled decisions
 

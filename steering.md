@@ -552,6 +552,17 @@ data: {"credential":"<random-secret>"}
 
 The credential is delivered only after approval and before message events are allowed to flow. The subscriber must retain the credential and present it when reconnecting, using the HTTP `Authorization: Bearer <credential>` header. Credential generation, encoding, server-side hash storage and replacement invalidation are specified below. Secure subscriber-side storage expectations and the exact recovery and replacement-delivery workflow remain to be specified.
 
+### File terminology and credential-file binding
+
+Use the established file terminology precisely:
+
+- **Subscribe files** are called subscribe files.
+- The **stream file** contains the subscriber records for that stream.
+- Do not invent or refer to a separate "subscriber file". There is no such file in this design.
+- When discussing subscriber records, identify them as records contained in the stream file.
+
+The proposal to bind a subscriber's bearer credential to a cryptographic hash of the stream file containing subscriber records remains under consideration. It is not yet a settled security mechanism. Any design must account for how changes to one subscriber record affect other subscribers' credentials, and must explain what security benefit the binding provides if an attacker obtains a copy of the relevant files. Do not assume that merely appending a hash stored alongside the bearer credential makes a stolen file unusable.
+
 ### Credential generation, encoding and storage
 
 **Settled decisions:**
@@ -567,7 +578,7 @@ The credential is delivered only after approval and before message events are al
 
 The plaintext credential exists only as needed to deliver it to the approved subscriber. Pulsyflux must not be able to recover an issued credential from its persistent authorisation records.
 
-The subscriber application is responsible for securely retaining its credential. The exact subscriber-side storage expectations remain to be specified.
+The subscriber application is responsible for securely retaining its credential. File-based storage is under consideration; the storage policy and exact subscriber-side storage expectations remain to be specified.
 
 ### Credential recovery and replacement
 

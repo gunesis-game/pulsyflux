@@ -685,7 +685,9 @@ When a schema is registered again, its recorder scans the retained trace files a
 
 The files are written only to local disk.
 
-One writer goroutine per stream owns its trace files.
+One writer goroutine per stream owns its trace files. The recorder and writer are created when the stream is first registered and remain alive for the rest of the process lifetime, including periods when the stream has no subscribers. Subscription opening or closing does not stop or recreate the recorder.
+
+On process shutdown, the recorder stops accepting new trace events, drains its queued events, emits any pending `trace.dropped` marker, flushes and closes the active file. On restart, recorders are recreated lazily when their streams are registered again; the recorder scans retained trace files and continues `traceSeq` after the highest retained value.
 
 Producers hand events to it through a bounded queue, configured by `trace.queueSize` and defaulting to 10000 events.
 

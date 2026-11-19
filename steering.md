@@ -1675,7 +1675,16 @@ Specify:
 - How expired pending records are cleaned up.
 - The exact format and storage arrangement for persistent approved subscriber–stream authorisation records.
 
-The one-subscriber-record-file-per-stream storage model is settled: each file contains both pending and approved records for its stream. Each stream's subscriber-record file uses JSON (one JSON document per stream file, not JSON Lines). The JSON document has no format-version field. Backwards compatibility with earlier file formats is not required; the implementation does not need to preserve compatibility when the format changes. The JSON document structure, record fields, validation, atomic-write procedure and other implementation details remain open.
+The one-subscriber-record-file-per-stream storage model is settled: each file contains both pending and approved records for its stream. Each stream's subscriber-record file uses JSON (one JSON document per stream file, not JSON Lines). The JSON document has no format-version field and has this top-level structure:
+
+```json
+{
+  "pending": [],
+  "approved": []
+}
+```
+
+The `pending` array contains pending subscriber approval records for that stream. The `approved` array contains approved subscriber–stream authorisation records for that stream. Backwards compatibility with earlier file formats is not required; the implementation does not need to preserve compatibility when the format changes. The record fields, validation, atomic-write procedure and other implementation details remain open.
 
 ### 5. Subsequent subscriptions
 

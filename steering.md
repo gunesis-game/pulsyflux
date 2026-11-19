@@ -123,15 +123,16 @@ Standard `testing` package only.
 
 ### Authentication
 
-Authentication is built into Pulsyflux and uses one shared in-memory credential store and one bearer-token verification mechanism for all subscriber roles. The three roles are `Application`, `System` and `Admin`.
+Authentication is built into Pulsyflux and uses one shared in-memory credential store and one bearer-token verification mechanism for all subscriber roles. The four roles are `Application`, `System`, `Security` and `Admin`.
 
 - **Application:** an external subscriber approved for one Subscriber ID + Stream ID relationship.
-- **System:** a Pulsyflux-managed internal subscriber to a stream. Pulsyflux creates and manages its identity and credential; external subscribers cannot claim this role.
+- **System:** a Pulsyflux-managed internal subscriber to a stream, such as Tracing. Pulsyflux creates and manages its identity and credential; external subscribers cannot claim this role.
+- **Security:** a reserved Pulsyflux-managed internal subscriber role for authentication and authorisation. Pulsyflux creates and manages its identity and credential at startup; external subscribers cannot request, claim, approve or impersonate this role.
 - **Admin:** the single global administrator role. It is not scoped to a stream and can administer every stream.
 
 Every subscriber presents a bearer token. Pulsyflux hashes it, finds the matching in-memory credential record, validates it and obtains the subscriber identity, role and stream scope. Authentication identifies the subscriber; authorisation checks the record's role and scope against the requested operation. A client cannot choose or elevate its own role.
 
-The credential store contains hashes, not plaintext tokens. Application and System records are scoped to their relevant subscriber–stream relationship. The Admin record is global and has no stream scope.
+The credential store contains hashes, not plaintext tokens. Application, System and Security records are scoped to their relevant subscriber–stream relationship. The Admin record is global and has no stream scope.
 
 Exactly one Admin credential record must exist in every running instance. Pulsyflux creates it at startup from the required `PULSYFLUX_ADMIN_TOKEN` environment variable. The token must contain at least 256 bits of cryptographically secure randomness. Pulsyflux hashes it and does not retain the plaintext. If the variable is missing or empty, Pulsyflux must fail startup. The Admin record cannot be requested, approved, duplicated or revoked through subscriber workflows. Changing the token requires restarting Pulsyflux.
 
@@ -143,7 +144,7 @@ A new Application Subscriber ID + Stream ID relationship enters the pending-appr
 
 On approval, Pulsyflux creates an Application credential record for that exact relationship, retains only its hash in memory, delivers the plaintext credential once on the existing pending SSE connection using the `pulsyflux.credential` event, and allows message events to flow. The relationship remains authorised for the lifetime of the running process. Reconnecting with its bearer credential does not require another approval, and approval for one stream never grants access to another.
 
-Pulsyflux generates Application and System bearer credentials using Go's `crypto/rand`: 32 random bytes (256 bits), encoded with unpadded Base64 URL-safe encoding (`base64.RawURLEncoding`). Only the SHA-256 digest is retained. Verification hashes the presented token and compares digests using a constant-time comparison. Returning subscribers present credentials only through the HTTP `Authorization: Bearer <credential>` header. Credentials must never appear in URLs, query parameters, traces, ordinary logs, errors or the administration interface. Credential delivery is one-time, uses cache-prevention headers and is excluded from SSE replay.
+Pulsyflux generates Application, System and Security bearer credentials using Go's `crypto/rand`: 32 random bytes (256 bits), encoded with unpadded Base64 URL-safe encoding (`base64.RawURLEncoding`). Only the SHA-256 digest is retained. Verification hashes the presented token and compares digests using a constant-time comparison. Returning subscribers present credentials only through the HTTP `Authorization: Bearer <credential>` header. Credentials must never appear in URLs, query parameters, traces, ordinary logs, errors or the administration interface. Credential delivery is one-time, uses cache-prevention headers and is excluded from SSE replay.
 
 Rejection and timeout close the pending connection with the same generic `subscription.closed` event and `{"code":"not_authorised"}` payload; the subscriber cannot distinguish the outcome. The actual decision may be recorded internally. An approved pending subscription proceeds on its existing SSE connection.
 
@@ -151,7 +152,7 @@ An authenticated Admin may revoke any approved Application Subscriber ID + Strea
 
 Subscriber IDs are normalised to lowercase. Names are required, trimmed, limited to 64 Unicode characters and rejected if they contain control characters. For an approved relationship, a Name update requires its valid bearer credential. A repeat pending request updates the existing Name without creating a duplicate or resetting the original 10-minute deadline. Concurrent updates are serialised per stream; the last processed update wins.
 
-All authentication and authorisation state is in memory only: pending requests, Application and System credential hashes, the single Admin record, role/scope records, active connections and revocation state. Pulsyflux creates, reads and writes no authentication-related files. On process exit, all this state disappears. On restart, Pulsyflux recreates exactly one Admin record from the environment variable; Application subscribers must request approval again and System subscribers are recreated internally.
+All authentication and authorisation state is in memory only: pending requests, Application, System and Security credential hashes, the single Admin record, role/scope records, active connections and revocation state. Pulsyflux creates, reads and writes no authentication-related files. On process exit, all this state disappears. On restart, Pulsyflux recreates exactly one Admin record from the environment variable; Application subscribers must request approval again and System subscribers are recreated internally.
 
 Authentication is programming-language independent and uses documented HTTP and SSE interfaces. A Go client library is optional and never required.
 
@@ -324,19 +325,22 @@ Its tests include the RFC 8785 test vectors.
 
 ## Authentication
 
-Authentication is built into Pulsyflux. It is not a separate service, process, standalone application or independently deployed module. It participates in the subscriber architecture as an internal capability.
+Authentication is built into Pulsyflux. It is not a separate service, process, standalone application or independently deployed module. Its authentication and authorisation workflow is implemented by an internal subscriber with the reserved `Security` role, using the same subscription and publishing mechanisms as other subscribers.
 
 ### Unified credential authentication
 
 All subscriber roles use the same bearer-token authentication path and the same in-memory credential store. Pulsyflux hashes the presented token, matches it to a stored credential hash, and reads the matched record's subscriber identity, role, stream scope and status. Role and scope are checked for every operation. A subscriber cannot choose its own role.
 
-The only roles are:
+The four roles are:
 
 - `Application`: external subscribers approved per Subscriber ID + Stream ID.
 - `System`: internal Pulsyflux subscribers to a stream, created and managed by Pulsyflux.
+- `Security`: reserved internal Pulsyflux subscriber for authentication and authorisation, created and managed by Pulsyflux.
 - `Admin`: one global administrator credential, not scoped to any stream.
 
-Credential records contain token hashes, not plaintext tokens. Application and System credentials are scoped to their subscriber–stream relationship. The Admin credential is global.
+Credential records contain token hashes, not plaintext tokens. Application, System and Security credentials are scoped to their subscriber–stream relationship. The Admin credential is global.
+
+The Security role is reserved and internal only. Pulsyflux creates its identity and credential during startup. It cannot be requested, approved, duplicated, revoked through subscriber workflows or assigned by an external client. The role is established from Pulsyflux's trusted internal startup provisioning; a client-supplied role name or identity is never sufficient proof.
 
 ### Admin credential and startup
 
@@ -367,7 +371,7 @@ An approved Subscriber ID + Stream ID relationship remains valid for the lifetim
 
 ### Credential generation, storage and revocation
 
-Pulsyflux generates Application and System credentials using Go's `crypto/rand`: 32 random bytes (256 bits), encoded with `base64.RawURLEncoding`. It retains only the SHA-256 digest in memory and compares digests in constant time. Returning subscribers send credentials in the HTTP `Authorization: Bearer <credential>` header.
+Pulsyflux generates Application, System and Security credentials using Go's `crypto/rand`: 32 random bytes (256 bits), encoded with `base64.RawURLEncoding`. It retains only the SHA-256 digest in memory and compares digests in constant time. Returning subscribers send credentials in the HTTP `Authorization: Bearer <credential>` header.
 
 Credentials and hashes must never appear in URLs, query parameters, traces, ordinary logs, error messages or the administration interface. Credential delivery is one-time, uses cache-prevention headers and is excluded from SSE replay.
 
@@ -437,7 +441,7 @@ Application subscribers identify themselves with their Subscriber ID and Name wh
 
 Subsequent subscriptions present the credential in the HTTP `Authorization: Bearer <credential>` header. Pulsyflux hashes the token, matches it against the in-memory credential store and uses the matched record's role and scope for authorisation.
 
-The Admin UI presents the global Admin bearer credential through the same authentication mechanism. Admin authority is not stream-scoped; the stream in the request identifies the target of the operation. System subscribers are internal Pulsyflux subscribers and use the same credential verification mechanism.
+The Admin UI presents the global Admin bearer credential through the same authentication mechanism. Admin authority is not stream-scoped; the stream in the request identifies the target of the operation. System and Security subscribers are internal Pulsyflux subscribers and use the same credential verification mechanism.
 
 ### List streams
 
@@ -845,9 +849,10 @@ The page also allows the administrator to revoke an approved Application subscri
 
 - The Admin credential is global and there is exactly one Admin record.
 - Application subscribers cannot assign themselves a role or invoke Admin operations.
-- System subscribers are created and managed internally by Pulsyflux.
+- System and Security subscribers are created and managed internally by Pulsyflux.
+- The Security subscriber uses the same subscription and publishing mechanisms as other subscribers. To prevent recursive authentication, the core recognises its trusted, startup-provisioned Security identity locally and does not delegate that identity's own role check back to the Security subscriber. This is a narrowly scoped trust check, not a separate subscription or publishing path.
 - Admin can administer every stream; the selected stream scopes an individual approval or revocation operation.
-- Ordinary stream approval never creates or modifies an Admin or System credential.
+- Ordinary stream approval never creates or modifies an Admin, System or Security credential.
 
 ### Visual design
 
@@ -1241,26 +1246,27 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 
 ## Open decisions
 
-### Next discussion: System subscribers
+### Internal subscribers and the Security role
 
-The next design discussion is to define the two internal System subscribers. The current proposal identifies exactly two:
+Pulsyflux has two internal subscribers in the initial design:
 
-1. **Tracing** — the internal subscriber responsible for consuming trace-relevant events and writing trace records.
-2. **Authentication & Authorisation** — the internal subscriber responsible for the authentication and authorisation workflow, including credential lookup, role resolution, pending Application approvals and revocation.
+1. **Tracing** — an internal `System` subscriber responsible for consuming trace-relevant events and writing trace records.
+2. **Authentication & Authorisation** — an internal `Security` subscriber responsible for authentication and authorisation workflows, including credential lookup, role resolution, pending Application approvals and revocation.
 
-These are internal System subscribers, not additional subscriber roles. The existing three roles remain `Application`, `System` and `Admin`. In particular, the Authentication & Authorisation System subscriber must not be confused with the global `Admin` role it manages.
+Both participate through the same subscription and publishing mechanisms used by other subscribers. Neither is a separate service or an alternative messaging path.
 
-This topic is deliberately not yet settled. Discuss and decide:
+The `Security` role is the fourth role alongside `Application`, `System` and `Admin`. It is reserved for Pulsyflux-managed internal use and cannot be requested or claimed by an external subscriber. Pulsyflux creates and provisions the Security subscriber's trusted identity and credential at startup.
 
-- Whether these are exactly two System subscriber instances, created and managed by Pulsyflux at startup.
-- Their identities, responsibilities, event subscriptions and lifecycle.
-- Whether the Authentication & Authorisation subscriber owns the in-memory credential store and is trusted directly by the core, or whether it must itself authenticate through that store.
-- How the core and other components interact with these subscribers without creating circular authentication dependencies.
-- The Tracing subscriber's access boundaries, especially ensuring that message payloads and credentials are never traced.
+To prevent recursive authentication, the core recognises the trusted, startup-provisioned Security identity locally when checking that subscriber's own access. It does not delegate the Security subscriber's own role check back to the Security subscriber. This exception is limited to establishing and checking that reserved internal identity; once recognised, the Security subscriber uses the ordinary subscription and publishing mechanisms. No client-declared role or identity is trusted.
 
-Do not assume answers to these questions or implement a design until this discussion has settled them.
+The following details remain open for design discussion:
 
-The three-role model, unified credential verification, global single Admin record and mandatory startup token remain settled decisions. This next discussion concerns the two internal System subscribers and their architecture, not a change to the role model.
+- The exact internal identity representation and bootstrap/provisioning mechanism by which the core recognises the Security subscriber.
+- The Security subscriber's precise event subscriptions and which authentication decisions are made by it versus enforced by the core.
+- The Tracing subscriber's exact event subscriptions and metadata access boundaries, especially ensuring that message payloads and credentials are never traced.
+- The lifecycle and failure behaviour of either internal subscriber after startup.
+
+Do not implement until the remaining design details have been discussed and the steering file has been updated.
 
 ## Settled decisions
 
@@ -1269,9 +1275,11 @@ The following points are settled by this steering file and are not open decision
 - First-release stream and message storage is in-memory and is lost on process exit.
 - All authentication and authorisation state is held in memory only; no authentication files are created or read.
 - Authentication uses one shared in-memory credential store and one bearer-token verification mechanism for all subscriber roles.
-- The only roles are `Application`, `System` and `Admin`.
+- The four roles are `Application`, `System`, `Security` and `Admin`.
 - Application subscribers are external subscribers approved independently for each Subscriber ID + Stream ID relationship.
 - System subscribers are Pulsyflux-managed internal subscribers to a stream; external clients cannot claim the System role.
+- Security is a reserved internal role for the authentication and authorisation subscriber. Its identity and credential are provisioned by Pulsyflux at startup; external clients cannot request or claim it.
+- The Security subscriber uses the same subscription and publishing mechanisms as other subscribers. The core locally recognises its trusted, startup-provisioned identity for its own role check, avoiding recursive delegation to Security without creating a separate messaging path.
 - Admin is a global role, not scoped to a stream.
 - Exactly one Admin credential record exists in memory in every running Pulsyflux instance.
 - `PULSYFLUX_ADMIN_TOKEN` is mandatory. If it is missing or empty, Pulsyflux fails startup.
@@ -1294,7 +1302,7 @@ The following points are settled by this steering file and are not open decision
 - Revocation immediately invalidates the affected Application credential and closes its active SSE connection.
 - If an Application subscriber loses its credential during the instance lifetime, an administrator revokes the relationship and the subscriber requests approval again for a new credential.
 - All pending requests, credential hashes, role records, sessions and active authentication state are in memory only and disappear on process exit.
-- On restart, Pulsyflux recreates exactly one Admin record from the environment variable; Application subscribers must request approval again and System subscribers are recreated internally.
+- On restart, Pulsyflux recreates exactly one Admin record from the environment variable; Application subscribers must request approval again, and System and Security subscribers are recreated internally.
 - Authentication is programming-language independent and uses documented HTTP and SSE interfaces. A Go client library is optional.
 - Streams use fan-out pub/sub (every subscriber receives every message) with replay, not competing-consumer queue semantics.
 - The stream ID hashes the complete schema document, including annotations such as `title`, `description` and `examples`.

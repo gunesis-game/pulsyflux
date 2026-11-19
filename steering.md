@@ -849,7 +849,7 @@ Pulsyflux provides an HTML administration page for reviewing and managing Applic
 
 The page authenticates as the single global Admin subscriber. The administrator enters the token configured through `PULSYFLUX_ADMIN_TOKEN`; the page presents it as a bearer credential and Pulsyflux validates it using the same token hashing, in-memory lookup and role resolution used for Application, System and Security subscribers.
 
-There is no separate administrator login protocol, username, password, browser session or special authentication bypass. The page keeps the bearer token in memory only and must not place it in URLs, persistent browser storage, page scripts, logs or traces. The token is not returned by any API.
+There is no separate administrator login protocol, username, password, browser session or special authentication bypass. After the administrator enters the token, the page may use it transiently in browser runtime memory to make authenticated requests. It must not be embedded in the static page's HTML, CSS or JavaScript assets, placed in URLs, persisted in browser storage, or written to logs or traces. The token is not returned by any API.
 
 Pulsyflux cannot start if `PULSYFLUX_ADMIN_TOKEN` is missing or empty, so every running instance has exactly one Admin credential record.
 
@@ -882,7 +882,7 @@ The page should be clear and pleasant to use. The selected stream must be obviou
 
 - The page is embedded static HTML, CSS and JavaScript with no build step and no third-party libraries.
 - It loads nothing remote and is covered by the same same-origin CSP header as the docs page.
-- The Admin bearer token must not be exposed in page scripts, URLs, persistent browser storage, logs or traces.
+- The Admin bearer token may be used transiently in browser runtime memory after entry, but must not be embedded in the static page's HTML, CSS or JavaScript assets, placed in URLs, persisted in browser storage, or written to logs or traces.
 - State-changing administration operations must reject cross-origin requests.
 - All credential hashes and role records are in memory only and disappear on process exit.
 - The page uses the existing Pulsyflux service and unified subscriber authentication component; it does not introduce a separate application or service.

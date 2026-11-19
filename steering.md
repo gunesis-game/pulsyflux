@@ -561,7 +561,18 @@ Use the established file terminology precisely:
 - Do not invent or refer to a separate "subscriber file". There is no such file in this design.
 - When discussing subscriber records, identify them as records contained in the stream file.
 
-The proposal to bind a subscriber's bearer credential to a cryptographic hash of the stream file containing subscriber records remains under consideration. It is not yet a settled security mechanism. Any design must account for how changes to one subscriber record affect other subscribers' credentials, and must explain what security benefit the binding provides if an attacker obtains a copy of the relevant files. Do not assume that merely appending a hash stored alongside the bearer credential makes a stolen file unusable.
+#### Protection against stolen stream files
+
+**Settled decision — authentication protection:** Possession of a stream file containing subscriber records alone must not allow an attacker to authenticate as an approved subscriber for that stream.
+
+- Each approved subscriber–stream relationship has its own bearer credential, generated independently using 32 bytes (256 bits) of cryptographically secure randomness.
+- The stream file stores only the SHA-256 digest of that credential. It never stores the plaintext bearer credential or a reversible representation of it.
+- A presented bearer credential is hashed and checked against the stored digest using a constant-time comparison. The stored digest itself is not accepted as a bearer credential.
+- Because the credential is uniformly random with 256 bits of entropy, possession of its SHA-256 digest does not make recovering the bearer credential computationally feasible.
+- Do not derive bearer credentials or authentication keys from the stream file's checksum. A checksum of a stolen file is reproducible by whoever possesses that file and does not provide secret material.
+- No separate persistent encryption key is required to meet this authentication-protection requirement.
+
+This decision addresses theft or copying of the stream file only. Detection or prevention of unauthorised modifications to the file is a separate tamper-protection concern and is not settled by this decision.
 
 ### Credential generation, encoding and storage
 

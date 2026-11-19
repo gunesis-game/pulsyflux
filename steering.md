@@ -197,7 +197,6 @@ It fails if production code (outside `_test.go` and `internal/testsupport`) uses
 It also fails if production code imports `internal/testsupport` or `net/http/httptest`.
 
 ## Contract-first rules
-
 ### Workflow
 
 1. Change `api/asyncapi.yaml`.
@@ -397,7 +396,6 @@ Authentication is programming-language independent and uses documented HTTP and 
 ## Intended contract surface
 
 This is the starting point for the spec, not the final contract.
-
 All paths are under `/v1`.
 
 ### Register schema
@@ -598,14 +596,13 @@ The bus records what happens to publishes and subscriptions, in the exact order 
 Each stream has its own trace, written to a local JSON Lines file and served through the trace SSE operation.
 
 ### Trace events
-
 `TraceEvent` is a contract schema in `api/asyncapi.yaml`, so its Go type is generated like every other wire type.
 
 `runId` is generated once when the process starts and remains constant for that process lifetime. It is an opaque unique identifier, not an ordering key. It does not replace `traceSeq`.
 
 ### TraceEvent fields
 
-- `traceSeq`: Per-stream order key. Starts at 1 for a new trace history and is strictly increasing. If the process restarts and the stream's trace files remain, the recorder continues after the highest retained `traceSeq`.
+- `traceSeq`: Per-stream order key. Starts at 1 for a new trace history and is strictly increasing. If no trace files remain when a stream is registered, the recorder starts a new trace history at 1; if the process restarts and retained trace files remain, it continues after the highest retained `traceSeq`. When a new history starts after the previous files are absent, an old SSE resume cursor cannot be distinguished from a cursor ahead of the new history; under the trace SSE resume rule, the server waits for future events with higher `traceSeq` values.
 - `at`: UTC timestamp, RFC 3339 with nanoseconds. For display only; ordering always uses `traceSeq`.
 - `kind`: One of the kinds below.
 - `streamId`: The stream the event belongs to.
@@ -797,8 +794,7 @@ The page opens one SSE connection per stream from `GET /v1/streams/{streamId}/tr
 - Filters by event kind and subscription.
 - Pause and resume.
 - Jump to `traceSeq`.
-- On reconnect the page resumes using the standard `Last-Event-ID` HTTP header.
-- Events still present in retained trace files are replayed.
+- On reconnect the page resumes using the standard `Last-Event-ID` HTTP header.- Events still present in retained trace files are replayed.
 - Events removed by rotation are reported through `trace.gap`.
 
 The page must not imply that events removed by rotation can be recovered.
@@ -997,8 +993,7 @@ After every Go change, run the complete verification set before committing:
 ```sh
 go build ./...
 go test ./...
-go vet ./...
-gofmt -l .
+go vet ./...gofmt -l .
 staticcheck ./...
 ```
 
@@ -1197,161 +1192,3 @@ The installer:
 Upgrades stop the service, replace application binaries and service metadata, preserve configuration and state, then restart the service.
 
 Uninstall stops and removes the service and application binaries but preserves configuration and state by default.
-
-Offer explicit removal only as a separate user choice.
-
-#### Linux
-
-Produce `.deb` and `.rpm` packages for supported architectures.
-
-Install a `systemd` unit for `pulsyflux.service`.
-
-Create a dedicated unprivileged system user and group named `pulsyflux` with no interactive login.
-
-Grant it access only to the required configuration, state and trace directories.
-
-Enable the unit for automatic startup at boot and start it after installation.
-
-Configure systemd to restart the service after an unexpected failure, while allowing an intentional stop or package removal to remain stopped.
-
-Package upgrades stop the service, replace application binaries and unit metadata, preserve configuration and state, reload systemd as needed, and restart the service.
-
-Ordinary package removal stops and disables the service and removes package-owned binaries and unit files, but preserves configuration and state.
-
-Purge/removal of persistent data must be an explicit separate action.
-
-#### Both platforms
-
-- Both service integrations must provide graceful shutdown.
-- Both must use the same production bootstrap and configuration as a foreground development run.
-- All runtime paths must be explicit and writable by the service identity.
-- The service must not depend on a user's home directory, terminal, interactive session, or current working directory.
-- Installation and service startup must not require internet access.
-- Provide documented service-management commands for status, start, stop and restart using the native operating-system service manager.
-- Do not add a second custom service supervisor or a separate application-level daemon protocol.
-- Package metadata includes the product name, version, architecture, publisher/project URL and license.
-- The license file and release notes are included in the package or linked from its metadata as appropriate.
-- The installers do not bundle Go, require an internet connection, download runtime dependencies, or install a database.
-- Runtime assets are embedded or installed locally.
-- The release includes SHA-256 checksums for every installer and a machine-readable checksum manifest.
-- Checksums are generated after packaging and verified before publication.
-- Build and packaging steps run in GitHub Actions on the appropriate Windows and Linux runners.
-- Pin action versions and packaging tool versions.
-- Do not store signing keys or credentials in the repository.
-- Signing can be enabled only through protected GitHub secrets and must not block unsigned development builds.
-
-### Release verification
-
-Before publishing, the release workflow must:
-
-1. Check out the exact tagged commit and verify the tag/version.
-2. Run the full `make build` gate.
-3. Build the Windows installer and Linux `.deb` and `.rpm` packages for each supported architecture.
-4. Run package-level checks on native Windows and Linux runners:
-   - Verify package metadata and contents.
-   - Install into a clean test environment.
-   - Verify the Windows service or Linux `systemd` unit is registered, enabled for automatic startup and running.
-   - Verify the service starts after a reboot or equivalent service-manager restart.
-   - Confirm it binds only to loopback.
-   - Exercise stop and restart.
-   - Uninstall/remove the package and verify the service is stopped and removed while configuration and state are preserved by default.
-5. Generate and verify SHA-256 checksums for all release artifacts.
-6. Attach installers, checksums and release notes to the GitHub Release.
-
-Publish only after all required jobs succeed.
-
-The release workflow must be reproducible from a tag: rerunning it for the same tag must use the same source commit and produce the same set of named artifacts.
-
-Where byte-for-byte reproducibility is not achievable because of platform packaging metadata, record that limitation. Do not silently claim reproducible binaries.
-
-## Open decisions
-
-The former “Internal subscribers and the Security role” discussion has been reconciled with the authoritative settled decisions below. Internal subscriber identity and provisioning, the existing Security authorisation request/decision contracts and validation, delivery and failure behaviour, timeout handling, tombstone retention, and recovery are settled; they are not open design topics.
-
-There are currently no open architectural decisions recorded in this section. Continue only with a newly identified decision when the user directs the discussion; do not infer or silently introduce new scope.
-
-Any newly identified decision that changes scope, externally visible behaviour or an acceptance criterion must be discussed and explicitly agreed before it is added to **Settled decisions**. Do not infer or silently settle decisions.
-
-## Next-session handoff
-
-**Resume from the latest `main` branch of this file.** Before proposing anything, read this handoff, the complete **Settled decisions** section, and the **Open decisions** section. Continue architecture discussion only: do not implement, scaffold, or create code. Discuss exactly one architectural decision at a time. For each proposal, explain both subsystem-specific behaviour and macro-architectural implications. A proposal explicitly marked NOT settled must remain unsettled until the user agrees. After each agreement, update this file directly on `main`, preserve all prior decisions, and verify the committed content by fetching it again.
-
-**Last completed discussions:** The user agreed to the precise retention-eviction `stream.gap` boundary rule. For a valid current-run cursor at sequence `seq` and oldest retained sequence `oldestSeq`, emit exactly one inclusive gap from `seq + 1` through `oldestSeq - 1` only when `seq + 1 < oldestSeq`, then replay from `oldestSeq`. If `seq + 1 == oldestSeq`, replay immediately without a gap. Gaps must never be empty, overlap, or include retained messages. This rule applies uniformly to Security, Tracing and all other subscribers; their already-settled recovery responses remain distinct. The user has also agreed that all authorisation event JSON fields use camelCase: `correlationId`, `subscriberId` and `streamId`; that administrator approval/rejection instructions must enter Security's existing event-driven workflow through the dedicated internal authorisation stream; that the instruction event is named `authorization.administratorDecisionRequested`; and that the instruction payload contains exactly `correlationId`, `subscriberId`, `streamId` and `requestedDecision`, with `requestedDecision` exactly `Approved` or `Denied`. The correlation ID is the original core-generated request UUID; the operation is not repeated. The user has now also agreed to the administrator instruction authentication and structural validation contract: only the authenticated global Admin principal may submit; the core validates the exact four-field payload, UUID identifiers and decision enum before publication; invalid or unauthorised instructions are not published; Security remains the decision-maker and the core applies its validated decision. The user has also agreed to duplicate and stale administrator instruction handling: repeated instructions may produce repeated decisions, but the core's existing first-valid-decision rule prevents repeated or conflicting decisions from changing authorisation more than once; expired, unknown and already-acted-on correlations cannot create or revive requests or change permissions; no separate instruction deduplication registry, acknowledgement, retry or tombstone policy is added. The user clarified the 10-minute Admin-mediated Application approval window: an unapproved pending request expires after 10 minutes and is no longer eligible for approval; expiry is not an explicit denial. The ordinary 5-second Security response timeout does not expire this Admin-mediated request. If approval is accepted before the 10-minute window ends, later SSE inactivity/connection timeout does not reverse, revoke or otherwise change the established authorisation. These decisions are recorded in the authoritative sections below.
-
-**Other recent decisions that must remain settled:**
-- Security becomes unavailable immediately on subscription detachment, including queue overflow. It can resume only after replay proves uninterrupted continuity from its last successfully processed event position. An unrecoverable `stream.gap` permanently disables Security for the remainder of that process run; recovery requires restart. The core remains fail-closed under the previously agreed existing-connection policy.
-- Internal subscribers use a distinct tagged internal-principal identity namespace, separate from Application Subscriber ID UUIDs. Reserved identities such as `security` and `tracing` are established only through trusted startup provisioning and credential records; this does not create a separate authentication or messaging path or grant blanket privileges.
-- Tracing is observational. Its per-stream recorder lifecycle, shutdown draining, reconnect/backoff, gap diagnostics, sink write/rotation failure behaviour, and startup retained-file integrity validation are settled. A failed or corrupt stream sink is disabled for the rest of the process; no unsafe retry, queue accumulation, truncation, overwrite, or guessed sequence is permitted. Other streams, the bus and Security continue unaffected.
-- Security's event-driven authorisation workflow, validation, deadlines, fail-closed handling, bounded workflow-owned tombstones, and recovery defaults are settled as recorded below. Preserve the distinction between Security's strict continuity requirement and Tracing's automatic warning clear after successful reconnection while retaining its gap diagnostic.
-
-**Next session's first task:** Re-read the latest `main` version of this file, including this handoff, **Open decisions**, and the complete **Settled decisions** section. The duplicate-versus-unknown classification issue for completed authorisation correlations is resolved: completed correlations use the existing bounded Security-workflow tombstone mechanism for 5 minutes after the accepted decision, sharing the default maximum of 10,000 records with expiry tombstones and evicting the oldest first. Subsequent decisions matching a retained completed-correlation tombstone are duplicates; after eviction or expiry they are unknown unless another retained classification applies. The user also clarified and approved the 10-minute Admin-mediated Application approval window: an unapproved pending request expires after 10 minutes and is no longer eligible for approval; expiry closes its pending SSE connection but is not an explicit denial. A decision arriving after expiry cannot approve or revive the request. This 10-minute window is distinct from the ordinary 5-second Security authorisation response timeout. If approval is accepted within the 10-minute window, a later SSE inactivity/connection timeout may close the connection but must not reverse, revoke or otherwise change the established authorisation. Continue the full-document consistency review from the next identified issue, one issue at a time, distinguishing contradictions from underspecified behaviour and editorial cleanup. Preserve all settled decisions, including the 5-second/10-minute timeout distinction. Do not implement or scaffold.
-
-No implementation or scaffolding is authorised.
-## Settled decisions
-
-The following points are settled by this steering file and are not open decisions:
-
-- First-release stream and message storage is in-memory and is lost on process exit.
-- All authentication and authorisation state is held in memory only; no authentication files are created or read.
-- Authentication uses one shared in-memory credential store and one bearer-token verification mechanism for all subscriber roles.
-- The four roles are `Application`, `System`, `Security` and `Admin`.
-- Application subscribers are external subscribers approved independently for each Subscriber ID + Stream ID relationship.
-- System subscribers are Pulsyflux-managed internal subscribers to a stream; external clients cannot claim the System role.
-- Security is a reserved internal role for the authentication and authorisation subscriber. Its identity and credential are provisioned by Pulsyflux at startup; external clients cannot request or claim it.
-- Internal subscribers use a distinct, tagged internal-principal identity namespace separate from Application Subscriber ID UUIDs. Pulsyflux assigns reserved internal identifiers (such as `security` and `tracing`) and establishes them only through trusted startup provisioning and credential records; clients cannot claim an internal identifier or role. The shared credential record binds each authenticated principal to its provisioned role and stream scope, which the core enforces. Internal subscribers retain distinct identities while using the ordinary subscription and publishing mechanisms; this does not create a separate authentication mechanism, messaging path or blanket privilege grant.
-- The Security subscriber uses the same subscription and publishing mechanisms as other subscribers. At startup, the core generates its 256-bit bearer credential, stores only its hash and trusted identity/role/scope record in the shared in-memory credential store, and hands the plaintext credential to the subscriber through a private, one-time in-memory handoff. The subscriber then uses ordinary bearer-token verification, subscription and publishing. The core's generic verifier resolves this pre-seeded Security record locally, so Security is not asked to authorise its own authentication or subscription and no separate messaging path is created.
-- Bounded tombstone handling is a shared architectural pattern, not a mandatory central service or global registry. Workflows that need late-versus-unknown classification remove expired operations from active pending state and may retain bounded, metadata-only correlation tombstones; tombstones never change the outcome of an expired operation. Each workflow owns its implementation, lifecycle, retention and capacity configuration, chosen for its own deadlines, delivery behaviour and resource constraints. Reconsider a shared implementation only when multiple workflows demonstrate genuinely common requirements.
-- When an authorisation request expires, the core removes it from the pending-request registry and retains a bounded, metadata-only tombstone for its correlation ID in memory. A subsequent decision matching an expiry tombstone is classified as late; a decision matching neither a pending request nor a retained tombstone is classified as unknown. When the core accepts the first valid decision for a pending correlation, it removes the request from the pending registry and retains a completed-correlation tombstone in the same bounded Security-workflow tombstone mechanism. A subsequent decision matching a completed-correlation tombstone is classified as duplicate, including a repeated or conflicting decision; it cannot change subscriber or authorisation state. Both expiry and completed-correlation tombstones are retained for 5 minutes from the corresponding expiry or successful decision, with a default maximum of 10,000 retained tombstones per running instance across both classifications. The 5-minute retention and 10,000-record capacity are specific to the Security workflow and deployment-configurable. When the capacity limit is reached, the oldest tombstone is evicted first; a later decision for an evicted correlation is classified as unknown. Tombstones never authorise or otherwise change permissions, contain no credentials, hashes or message content, and are cleared on process restart. Tracing records late, duplicate and unknown discard metadata independently under its existing trace retention and sink-failure behaviour; Security/core classification must not depend on Tracing availability.
-- The Security subscriber owns subscriber-access and authorisation policy decisions: it receives relevant workflow events and decides whether Application access is pending, approved, rejected or revoked, and determines the permitted role and stream scope. The core owns foundational credential verification and enforcement: it verifies bearer credentials against the shared in-memory store, enforces the identity, role and scope on operations, manages pending and active SSE connections, enforces timeouts and connection limits, and performs the minimal bootstrap trust check for Security itself. The core does not delegate Security's own authentication or subscription authorisation back to Security.
-- Security subscribes to events for new subscription attempts, reconnection attempts, Application approval and rejection outcomes, credential revocations, and subscriber identity or permission changes. These events provide Security with the workflow context needed for its policy decisions. Event payloads must not contain bearer credentials, credential hashes or message content; event schemas, ordering, delivery behaviour, failure handling, and late/duplicate/unknown decision handling are settled below.
-- Tracing subscribes to both `authorization.requested` and `authorization.decided` on the shared internal authorisation stream and correlates them by `correlationId`, associating each decision with its original request and operation. It records every valid `Approved` and `Denied` outcome, plus late, duplicate and unknown decisions. Outcome records include event type, correlation ID, timestamp, subscriber ID, stream ID and decision, with the correlated request's operation where available. Discard records include event type, correlation ID, timestamp and discard reason. Tracing never records bearer credentials, credential hashes or message payloads. It is observational only, cannot approve, deny or alter authorisation, and its unavailability must not prevent Security or the core from processing authorisation.
-- Each stream's recorder and writer are created when its schema is first registered and remain alive until process shutdown, independent of subscriber activity. Orderly shutdown stops accepting trace events, drains queued events, emits any pending `trace.dropped` marker, flushes and closes the active file. On restart, recorders are recreated lazily when streams are registered and resume `traceSeq` after the highest retained value.
-- Tracing's internal System subscriber automatically reconnects after disconnect/crash using its reserved startup-provisioned identity and credential, through the ordinary subscription mechanism and normal SSE replay. It receives no special broker privileges or unlimited queue, and its recovery never blocks Security or the core.
-- An unrecoverable `stream.gap` is recorded in trace history with the affected source stream and missing sequence range. Tracing never fabricates missing events or infers Security decisions. Its health becomes degraded immediately on disconnect or unrecoverable gap, and the warning clears automatically on successful reconnection; the gap diagnostic remains in trace history. Repeated failures mark it degraded immediately.
-- If a stream's trace file sink encounters a write or rotation error, it is permanently disabled for the remainder of the process. The recorder immediately stops enqueueing new events for that stream and discards them; they do not accumulate in the writer queue or increment queue-overflow drop counts or produce `trace.dropped` markers. The sink is not retried or recreated in the same process; restart is required to restore file tracing. `/health` continues to report the affected stream and degraded trace status, while the bus and Security authorisation continue unaffected.
-- On recorder startup/stream registration, every retained trace file and JSON Lines record is validated before continuing `traceSeq` after the highest retained value. If any retained file is unreadable or contains a malformed record, the recorder does not skip it, truncate it, overwrite it, append to it or guess the next sequence number. File tracing for that stream is permanently disabled for the remainder of the process; `/health` reports the affected stream and degraded trace status, and retained files are left untouched for operator inspection or repair. Other streams and the bus continue normally.
-- Tracing reconnects with exponential backoff using a 2× multiplier and full jitter. After each unsuccessful attempt, the backoff cap doubles, starting at 1 second and capped at 60 seconds by default; the actual retry delay is selected uniformly at random from zero up to that cap. The initial and maximum delays are deployment-configurable through `trace.reconnectInitialDelay` and `trace.reconnectMaxDelay`. Successful reconnection resets the backoff.
-- `authorization.requested` and `authorization.decided` are published on one dedicated internal stream. The core publishes requests and consumes decisions; Security consumes requests and publishes decisions. Both subscribers ignore event types they do not handle, including events they themselves publish. The stream uses the ordinary broker, subscription, publishing, ordering and delivery mechanisms; it is not a separate messaging path.
-- Administrator approval and rejection instructions enter Security's existing event-driven authorisation workflow through the dedicated internal authorisation stream. The Admin UI submits the administrator's instruction to the core using the global Admin credential; the core publishes the instruction as `authorization.administratorDecisionRequested` on that stream; Security consumes it, evaluates it and publishes the resulting `authorization.decided` event. The core validates and applies that decision through the already-settled decision mechanism. The core does not directly apply the administrator's authorisation decision or call Security. The instruction payload contains exactly `correlationId`, `subscriberId`, `streamId` and `requestedDecision`. `correlationId` is the original core-generated authorisation request UUID; `subscriberId` and `streamId` identify that exact relationship; `requestedDecision` is exactly `Approved` or `Denied`. The payload does not repeat the original request's operation. Before publishing the event, the core authenticates the bearer credential through the shared credential store and requires the authenticated principal to have the global `Admin` role; the sender's authority is derived from the authenticated credential record, never from request-supplied identity or role fields. The core validates that the payload is a JSON object containing exactly the four required fields and no additional fields; `correlationId` is a valid UUID; `subscriberId` is a valid Application Subscriber ID UUID; `streamId` conforms to the established stream-ID representation; and `requestedDecision` is exactly `Approved` or `Denied` with case-sensitive matching. Invalid or unauthorised instructions are rejected by the core and are not published. The core publishes only the validated four-field instruction. Security independently evaluates it through its existing event-driven policy workflow and publishes the resulting `authorization.decided`; the core validates and applies that decision through the already-settled Security decision mechanism. The core does not directly grant or deny access based on the Admin instruction. Repeated delivery of the same administrator instruction may cause Security to publish repeated `authorization.decided` events; no instruction-specific deduplication registry or second idempotency mechanism is introduced. The core's existing first-valid-decision rule remains authoritative: the first valid decision received for a pending correlation wins, and every subsequent decision for that correlation is discarded and recorded as a duplicate, even if it requests the conflicting outcome. Thus repeated or conflicting instructions cannot reverse or repeat an authorisation effect. If the original request has expired, a resulting decision is discarded and recorded as late using the existing tombstone classification; it cannot revive the request. If the correlation matches neither a pending request nor a retained tombstone, the decision is discarded and recorded as unknown; it cannot create a request or change permissions. Already-acted-on correlations are handled by the existing duplicate-decision rule. No administrator-instruction-specific acknowledgement protocol, retry mechanism, deduplication registry or tombstone policy is added; existing core-owned pending-request and tombstone handling remains authoritative.
-- The `authorization.requested` event payload contains `correlationId`, `subscriberId`, `streamId` and `operation`. The core generates `correlationId` as a cryptographically random UUID; `subscriberId` and `streamId` identify the exact relationship under evaluation. `operation` initially supports `subscribe`, `reconnect` and `permissionChange`. The payload contains no bearer credentials, credential hashes or message content.
-- All authorisation event JSON field names use camelCase: `correlationId`, `subscriberId` and `streamId`. Security authorisation events follow the broker's existing per-stream sequence ordering. The workflow adds no application-level acknowledgement or retry protocol. If Security is disconnected or its bounded subscription queue overflows before processing a request, the request may go unprocessed; the core never infers approval from delivery failure or silence. The core's configurable 5-second authorisation timeout (by default) applies to ordinary Security authorisation requests that are not awaiting human Admin approval; if Security does not decide within that deadline, the core fails the request closed and removes it from the pending registry. An Application request awaiting Admin approval remains pending for its separate 10-minute approval window, and its original correlation remains eligible for the administrator instruction and resulting Security decision only during that window. If no approval is accepted within 10 minutes, the pending request expires and is no longer eligible for approval; this expiry is not an explicit denial. The ordinary 5-second timeout does not expire that Admin-mediated request. An SSE connection timeout after approval may close the inactive connection but does not change the established authorisation. A decision is accepted at most once for its correlation ID; duplicate decisions are discarded and recorded. The broker's existing queue-overflow behaviour, including subscriber detachment and `stream.gap`, remains in force. Tracing records metadata for every valid `Approved` or `Denied` authorisation outcome, including event type, correlation ID, timestamp, subscriber ID, stream ID and decision; where available from the correlated request, the operation is included. It also records diagnostic metadata for late, duplicate and unknown decisions, including event type, correlation ID, timestamp and discard reason. These records never contain bearer credentials, credential hashes or message payloads. Tracing is observational and is not part of the authorisation decision path.
-- The `authorization.decided` event payload contains `correlationId`, `subscriberId`, `streamId` and `decision`. `correlationId` echoes the core-generated UUID from the request; `subscriberId` and `streamId` must exactly match the original request. `decision` is exactly `Approved` or `Denied`; no other values are valid.
-- An authorisation request is a logical request carried by an SSE event published by the core through Pulsyflux's existing event infrastructure. Security receives it through its ordinary subscription and publishes its decision as an ordinary event; the core receives and enforces that decision through the same event infrastructure. The SSE event is the transport/delivery mechanism, while the authorisation request is the logical message carried by the event. This is not a direct function call, RPC, HTTP request to Security, or separate messaging channel.
-- An ordinary Security authorisation request that is not awaiting human Admin approval and receives no Security decision before its deadline fails closed: the core denies the request and does not grant access by default. The ordinary Security authorisation timeout is configurable and defaults to 5 seconds. When such a request expires, the core immediately removes it from the pending-authorisation registry and retains an expiry tombstone under the bounded retention rules above. A decision matching that tombstone is late and must be ignored; it cannot change subscriber or authorisation state. An Application request awaiting human Admin approval follows a separate 10-minute approval window. Its original correlation remains eligible for the administrator instruction and resulting Security decision only during that window; the ordinary 5-second timeout does not expire it. If no approval is accepted within 10 minutes, the pending request expires and the core closes its pending SSE connection under the existing generic timeout behaviour. Expiry is not an explicit denial, and a later decision cannot authorise or revive the request. If approval was accepted before expiry, a subsequent SSE inactivity timeout may close the connection but does not reverse, revoke or otherwise change the established authorisation. The SSE timeout itself is not an authorisation decision. The first valid decision received for a pending correlation wins: after accepting it, the core removes the request from the pending-authorisation registry and retains a completed-correlation tombstone under the bounded retention rules above. Any subsequent decision matching that tombstone is discarded and recorded as a duplicate; it cannot change subscriber or authorisation state. A Security decision is valid only when its publisher is authenticated as the reserved Security identity, its correlation ID matches a currently pending request, its decision type is explicitly `Approved` or `Denied`, and it arrives before the applicable deadline (5 seconds for ordinary Security authorisation, or 10 minutes for an Application request awaiting Admin approval). Any decision that fails these checks is rejected or discarded and recorded as appropriate. A decision from the authenticated Security identity whose correlation ID matches neither a currently pending request nor a retained expiry or completed-correlation tombstone is discarded and recorded as an unknown decision. It does not create a pending request or change any subscriber's permissions. Each authorisation request receives a unique correlation ID generated by the core as a cryptographically random UUID. Clients and Security cannot choose or supply this ID.
-- Security unavailability is handled fail-closed. While Security is unavailable, the core must not grant or authorise new subscriptions or reconnections, and must not process permission-changing decisions or updates without Security's policy decision. Existing authorised connections may continue only under their already-established permissions for the remainder of their existing connection lifecycle; this does not authorise a new connection or reconnection.
-- After a Security outage, the Security subscriber recovers by re-authenticating with its existing reserved credential and re-subscribing through the ordinary subscription mechanism. It resumes processing its subscribed events before the core authorises new subscriptions, reconnections or permission changes. The core continues to enforce the fail-closed policy until Security has successfully resumed.
-- If the Security subscriber crashes or becomes unavailable, Pulsyflux retries its recovery automatically using the same 2× exponential backoff multiplier and full-jitter algorithm as Tracing. After each unsuccessful attempt, the backoff cap doubles and is capped at Security's independently configured maximum; the actual retry delay is selected uniformly at random from zero up to that cap. The independently deployment-configurable settings are `security.recoveryInitialDelay` (default 1 second) and `security.recoveryMaxDelay` (default 60 seconds). Retries continue without administrator intervention. The core remains fail-closed throughout recovery and does not bypass Security after repeated failures. Normal authorisation resumes only after Security has re-authenticated with its existing reserved credential, re-subscribed through the ordinary subscription mechanism and resumed processing its subscribed events. Successful recovery resets Security's backoff to its initial value.
-- Security subscription detachment and unrecoverable `stream.gap` handling are settled: Security becomes unavailable immediately on detachment, including queue overflow, and the core remains fail-closed under the existing policy. Security automatically reconnects through ordinary subscription/SSE replay using its existing reserved credential and Security recovery backoff. It resumes policy processing only after replay proves uninterrupted continuity from its last successfully processed event position; receiving or queueing an event does not advance that position. Successful recovery resets the backoff. On an unrecoverable `stream.gap`, Security records the source stream and missing sequence range, fabricates no events and infers no missed approvals, denials, revocations or permission changes, and does not resume using potentially stale policy state. Security remains unavailable for the rest of that process run, requiring a process restart for recovery because no snapshot/reconciliation protocol exists. This rule applies to stateful policy consumers whose correctness requires complete event history, not observational consumers such as Tracing. More generally, recovery guarantees are determined by subscriber correctness requirements, not internal/external status; no special broker privileges or unlimited queues are introduced.
-- Admin is a global role, not scoped to a stream.
-- Exactly one Admin credential record exists in memory in every running Pulsyflux instance.
-- `PULSYFLUX_ADMIN_TOKEN` is mandatory. If it is missing or empty, Pulsyflux fails startup.
-- The Admin token must contain at least 256 bits of cryptographically secure randomness. Pulsyflux hashes it at startup and creates the single Admin credential record; it does not retain the plaintext token.
-- The Admin credential cannot be created, approved, duplicated or revoked through subscriber workflows.
-- The HTML administration page is an Admin subscriber and authenticates through the same bearer-token hash lookup and role resolution as every other subscriber. There is no separate administrator browser session or authentication bypass.
-- Admin can discover and administer every stream. Selecting a stream scopes the operation, not the Admin credential.
-- Each Application subscriber installation supplies a stable Subscriber ID UUID and a descriptive Name. Neither is a credential or proof of authorisation.
-- Subscribers request Application access by attempting to subscribe; there is no separate subscriber registration workflow.
-- New Application access requires administrator approval before message events can flow.
-- Approval is scoped to exactly one Subscriber ID + Stream ID relationship and remains valid for the lifetime of the running process.
-- Pending Application subscriptions can remain connected through SSE while awaiting approval, for a maximum of 10 minutes. If approval is not accepted within that window, the pending request expires and is no longer eligible for approval; expiry is not an explicit denial. An SSE inactivity timeout after approval may close the connection but does not change the established authorisation.
-- An approved pending subscription proceeds on its existing SSE connection.
-- Rejection and timeout use the same generic terminal event and do not reveal the administrator's decision.
-- Pulsyflux generates 256-bit random bearer credentials for Application, System and Security subscribers using Go's `crypto/rand`, encoded as unpadded Base64 URL-safe text. For Security, the core generates the credential before the subscriber starts, seeds its hash and trusted role record in the shared in-memory credential store, and hands the plaintext credential to the subscriber through a private, one-time in-memory startup handoff.
-- Only SHA-256 credential digests are stored in memory; presented tokens are hashed and digest comparisons use a constant-time comparison.
-- Credentials are bound to their assigned subscriber identity, role and stream scope.
-- Credentials are delivered once, never placed in URLs, and excluded from traces, ordinary logs, errors and the administration interface.
-- Returning subscribers present bearer credentials in the HTTP `Authorization: Bearer` header.
-- Revocation immediately invalidates the affected Application credential and closes its active SSE connection.
-- If an Application subscriber loses its credential during the instance lifetime, an administrator revokes the relationship and the subscriber requests approval again for a new credential.
-- All pending requests, credential hashes, role records, sessions and active authentication state are in memory only and disappear on process exit.
-- On restart, Pulsyflux recreates exactly one Admin record from the environment variable; Application subscribers must request approval again, and System and Security subscribers are recreated internally.
-- Authentication is programming-language independent and uses documented HTTP and SSE interfaces. A Go client library is optional.
-- For a valid current-run resume cursor at sequence `seq`, if the oldest retained sequence is `oldestSeq`, retention eviction produces exactly one inclusive `stream.gap` from `seq + 1` through `oldestSeq - 1` only when `seq + 1 < oldestSeq`; retained replay then begins at `oldestSeq`. If `seq + 1 == oldestSeq`, there is no gap. Gaps are never empty or overlapping and never include retained messages. This precise boundary rule is uniform across subscribers, while each subscriber's response to a gap follows its own settled correctness requirements.
-- Streams use fan-out pub/sub (every subscriber receives every message) with replay, not competing-consumer queue semantics.
-- The stream ID hashes the complete schema document, including annotations such as `title`, `description` and `examples`.
-- The service is loopback-only and is not reachable from the LAN.
-- Message content is never included in traces.
-- The trace flush interval defaults to 50ms and is configurable.
-- The trace writer queue defaults to 10000 events and is configurable.
-- There is no public stream-clear or stream-delete operation in the first release.
-- SSE replay uses the standard `Last-Event-ID` HTTP header only. No `?lastEventId=` query parameter or alternative query-based replay mechanism is supported.

@@ -659,7 +659,7 @@ Clock resolution on Windows is too coarse to separate events that happen close t
 
 Each stream's trace is ordered by its own `traceSeq` in the file, on the SSE operation and on the page.
 
-The monitor page merges multiple streams client-side using timestamps for display order, but ordering within a stream always uses `traceSeq`.
+The monitor page displays only the selected stream's trace, ordered by that stream's `traceSeq`; it does not merge events from multiple streams.
 
 ### Trace sinks
 

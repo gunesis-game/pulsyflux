@@ -87,7 +87,7 @@ In-memory only for the first release, bounded by retention limits.
 
 All streams and retained messages are lost when the process exits.
 
-Authentication approval records are an explicit exception: pending subscriber approvals and persistent approved subscriber–stream authorisations are stored on local disk so they can survive a process restart.
+Authentication subscriber records are an explicit exception: every stream has its own local stream subscriber file containing that stream's pending and approved subscriber–stream records. These files survive process restarts. A subscriber authorised for multiple streams has a separate record in each stream's file.
 
 Durable storage for streams and messages is out of scope unless separately specified.
 
@@ -162,7 +162,7 @@ The approval wait is limited to 10 minutes. If approval is not obtained within t
 
 The administration interface allows an authenticated administrator to select streams and review their pending subscribers. The interface displays each subscriber's stable Subscriber ID and its current Name for that stream.
 
-Pending subscriber approvals are stored in separate files, one per stream, on local disk.
+Each stream has one dedicated subscriber-record file on local disk. It contains that stream's pending subscriber approval records and approved subscriber–stream authorisation records. Do not split pending and approved records into separate per-stream files, and do not use a shared cross-stream subscriber-record file.
 
 Persistent approved subscriber–stream authorisations must also survive a process restart.
 
@@ -1619,7 +1619,7 @@ Settled:
 - Credentials and credential digests are excluded from traces, ordinary logs, error messages and the administrator interface.
 - Returning subscriptions present the bearer credential only through the HTTP `Authorization: Bearer <credential>` header; credentials are never placed in URLs or query parameters.
 - Pulsyflux manages credential generation, validation, storage and revocation.
-- Pending subscriber approvals are maintained in separate per-stream files on disk.
+- Pending and approved subscriber–stream records are maintained together in one dedicated local subscriber-record file per stream.
 - An administrator authenticates through a local HTML administration page.
 - The administrator selects streams and reviews pending subscribers for each stream, identified by Subscriber ID and Name.
 - A pending SSE subscription remains open while approval is pending.
@@ -1675,9 +1675,7 @@ Specify:
 - How expired pending records are cleaned up.
 - The exact format and storage arrangement for persistent approved subscriber–stream authorisation records.
 
-The per-stream pending approval file approach is settled. Its exact record format and implementation details remain open.
-
-Persistent subscriber–stream authorisation is settled. Its exact record format and implementation details remain open.
+The one-subscriber-record-file-per-stream storage model is settled: each file contains both pending and approved records for its stream. The exact file format, record fields, and implementation details remain open.
 
 ### 5. Subsequent subscriptions
 

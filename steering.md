@@ -87,7 +87,7 @@ In-memory only for the first release, bounded by retention limits.
 
 All streams and retained messages are lost when the process exits.
 
-Authentication state is also in-memory only. Pulsyflux does not create authentication, approval, subscriber-record or credential files. Pending requests, approved subscriber–stream sessions, subscriber credential hashes and administrator browser sessions are lost when the process exits.
+Authentication state is also in-memory only. Pulsyflux does not create authentication, approval, subscriber-record or credential files. Pending requests, approved Application relationships, System credentials, the single Admin credential record, credential hashes and active connections are lost when the process exits.
 
 Durable storage for streams and messages is out of scope unless separately specified.
 

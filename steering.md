@@ -693,6 +693,8 @@ Tracing's internal subscriber automatically reconnects after a disconnect or cra
 
 When Tracing receives a `stream.gap` for its internal authorisation-event subscription, it records an explicit diagnostic in its own trace history identifying the affected source stream and missing sequence range. Tracing does not fabricate missing authorisation events or infer Security decisions. The gap places Tracing's health status in a degraded state until the gap is acknowledged or otherwise resolved operationally.
 
+A recorded authorisation-event gap keeps Tracing's health status degraded until an operator explicitly acknowledges that specific gap. Reconnection or subsequent event delivery does not clear the degraded status. Acknowledgement identifies the gap being acknowledged, so acknowledging an older gap cannot clear a newer one.
+
 Producers hand events to it through a bounded queue, configured by `trace.queueSize` and defaulting to 10000 events.
 
 Tracing never blocks a publish or a delivery.

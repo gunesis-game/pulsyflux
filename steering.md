@@ -697,6 +697,8 @@ A recorded authorisation-event gap places Tracing's health status in a degraded 
 
 If Tracing disconnects again or detects another unrecoverable authorisation-event gap after recovery, its health status becomes degraded immediately when that condition is detected; no additional timeout is required.
 
+Tracing retries its internal subscription using exponential backoff with a configured maximum delay, avoiding repeated rapid reconnect attempts during a broker outage. A successful reconnection resets the retry delay.
+
 Producers hand events to it through a bounded queue, configured by `trace.queueSize` and defaulting to 10000 events.
 
 Tracing never blocks a publish or a delivery.

@@ -578,6 +578,9 @@ A field is never renamed between publish and subscribe (for example `eventType` 
 
 These are the usual defects of in-memory brokers. Each one is forbidden:
 
+- Subscription registration and replay-snapshot capture are atomic with respect to publishing under the stream lock. The broker registers the subscriber and captures the retained replay snapshot as one ordered handoff, so every publish is either included in that snapshot or queued for that subscriber as live delivery; no publish can fall between the two phases.
+- The subscription owner delivers the captured replay snapshot in `seq` order before draining messages queued for live delivery. Live publishes that occur after registration are queued while replay is being delivered and cannot overtake replay messages. The handoff does not hold the stream lock while sending to the subscriber. Replay and live messages share the subscriber's existing bounded data-queue limit and overflow handling; this ordering guarantee does not create an unbounded buffer.
+
 - Never send on a channel while holding a stream lock that a reader needs. Replaying into a bounded channel under the stream lock deadlocks the stream once the replay is larger than the channel.
 - Only the subscription's owner closes its channel. Fan-out never sends to a channel that can be closed concurrently, because that panics.
 - Remove subscribers by identity, never by a captured slice index. Indexes shift when earlier subscribers leave.

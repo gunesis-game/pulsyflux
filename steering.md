@@ -782,3 +782,27 @@ Before proposing anything, read this handoff, the complete **Settled decisions**
 **Last completed work:** The shared Broker/Core/participant architecture was added to the mission, foundational architecture, Broker semantics introduction, Storage, Tracing, package-layout guidance, Open decisions and this handoff. Tracing was reframed as a Broker participant. Older trace-specific persistence and cursor decisions were marked for supersession/reconciliation. The latest content must be verified from the current `main` branch before continuing; do not rely on commit identifiers from older handoffs.
 
 **Resume instruction:** Start with Broker semantics. Do not jump back into implementing Tracing. First make the Broker contract coherent enough that Application, Security, Tracing and Admin can all use the same publish/subscribe infrastructure without direct component calls or subsystem-owned messaging/storage infrastructure.
+
+
+## Session handoff — Broker retention limits
+
+Current discussion is at the Broker retention-policy decision. The following is a proposal only and has **not** been approved:
+
+- Configure retention using all three dimensions: maximum age, maximum message count and maximum storage size.
+- Enforce these limits against the Broker-owned authoritative stream history, not subscriber delivery buffers.
+- Configure defaults by stream class, with optional per-stream overrides.
+- When a limit is exceeded, remove the oldest eligible retained messages until the configured limits are satisfied.
+
+Example values discussed for illustration only (not approved defaults): 7 days, 100,000 messages and 500 MB.
+
+**Next action:** ask the user whether they agree with the three-dimensional retention model. If approved, record it as settled; then decide the precise eviction semantics, including how age/count/size limits interact, whether deletion is immediate or periodic, and how replay reports messages that are no longer retained.
+
+### Current architectural decisions carried forward
+
+- Broker owns each stream's authoritative ordered message history and assigns one monotonically increasing sequence per stream when a message is accepted.
+- Rejected publications do not consume sequence numbers. Fan-out deliveries retain the same stream sequence.
+- Sequence continues from the last restored message after restart; a new process receives a new `runId`. A stream with no restored messages starts at sequence 1.
+- Broker owns retention of authoritative history. Replay reads from that history; subscriber delivery buffers are bounded, temporary and independent.
+- Core provides shared snapshot and persistence mechanisms for Broker-owned state. Snapshots capture defined Broker state; persistence durably stores selected snapshot data; restoration repopulates Broker's authoritative state before normal use.
+- Snapshot frequency, persistence timing, exact snapshot boundaries and crash-recovery guarantees remain open decisions.
+- Work remains architecture/design only: no implementation or scaffolding. Continue editing `steering.md` on `main`, preserving previously agreed decisions.

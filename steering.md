@@ -58,6 +58,7 @@ This is a settled Core scheduling model:
 - There are no separate per-stream snapshot timers, and publication does not trigger a synchronous snapshot.
 - The snapshot interval is part of the policy provided by each stream class. Each persistence-enabled stream uses its stream class's configured interval unless that stream has an explicit per-stream override.
 - Per-stream overrides change only the effective due interval; they do not create per-stream timers. The one global scheduler evaluates each eligible stream against its effective interval.
+- Snapshot intervals are fixed policy values, not adaptive values. Core does not automatically increase or decrease a stream's interval in response to publication activity or observed load. A per-stream override is likewise a fixed configured value unless explicitly changed by configuration.
 - Actual interval values remain undecided.
 - This scheduler operates on Broker-owned stream state. It does not change Broker's ownership of authoritative history or the settled rule that publication acceptance does not wait for snapshot completion.
 
@@ -783,7 +784,8 @@ The user approved one global periodic scheduler in Core for all streams opted in
 
 - The scheduler checks eligible streams and snapshots only streams whose persisted state has changed since their last successfully completed snapshot.
 - There are no per-stream timers and no synchronous snapshot on each publication.
-- The snapshot interval is part of each stream class's policy, with an optional per-stream override. The global scheduler evaluates each persistence-enabled stream against its effective interval; this does not create per-stream timers. Actual interval values are not decided here.
+- The snapshot interval is part of each stream class's policy, with an optional per-stream override. The global scheduler evaluates each persistence-enabled stream against its effective interval; this does not create per-stream timers.
+- Intervals are fixed configuration values, not automatically adjusted in response to publication activity or observed load. Explicit configuration changes may change a value; automatic adaptive scheduling is not part of the design.
 - Core performs this shared scheduling over Broker-owned state. Broker remains authoritative, and the previously settled asynchronous publication/durability contract remains unchanged.
 
 Actual snapshot interval values and a bounded crash-loss window remain open decisions.
@@ -900,7 +902,7 @@ Before proposing anything, read this handoff, the complete **Settled decisions**
 
 **Last completed work:** The shared Broker/Core/participant architecture was added to the mission, foundational architecture, Broker semantics introduction, Storage, Tracing, package-layout guidance, Open decisions and this handoff. Tracing was reframed as a Broker participant. Older trace-specific persistence and cursor decisions were marked for supersession/reconciliation. The Broker delivery, retention, replay, persistence and snapshot decisions listed below have also been approved and recorded. Always fetch the current `main` branch before continuing; do not rely on commit identifiers from older handoffs.
 
-**Settled decision — snapshot interval configuration policy:** The interval is part of the policy provided by each stream class. Each persistence-enabled stream uses its class's configured snapshot interval unless an explicit per-stream override is supplied. Core retains one global periodic scheduler; it evaluates each eligible stream against that stream's effective interval and snapshots only changed persisted state when due. Per-stream overrides do not create per-stream timers. Actual interval values remain a separate open decision. Do not silently choose or record a default.
+**Settled decision — snapshot interval configuration and behaviour:** The interval is part of the policy provided by each stream class. Each persistence-enabled stream uses its class's configured snapshot interval unless an explicit per-stream override is supplied. Core retains one global periodic scheduler; it evaluates each eligible stream against that stream's effective interval and snapshots only changed persisted state when due. Per-stream overrides do not create per-stream timers. Intervals are fixed configured values: Core does not adapt them automatically to publication activity or observed load. Actual interval values remain a separate open decision; do not silently choose or record a default.
 
 **Other remaining persistence decisions:** Actual snapshot interval values and a bounded crash-loss window remain unresolved. Do not invent a numeric crash-loss guarantee. The snapshot boundary and atomic-promotion mechanisms are settled as described below.
 
@@ -957,7 +959,7 @@ The user has approved the three-dimensional retention model and oldest-first evi
 - Each snapshot is a consistent point-in-time state of one stream, identified by its highest included Broker sequence. Messages accepted after that boundary are excluded from the snapshot in progress and remain in authoritative history for a later snapshot. Publication is not blocked.
 - Snapshot completion requires the complete captured state to be persisted. Write a new snapshot separately, validate it, then atomically promote it as latest completed snapshot; retain the previous completed snapshot until promotion succeeds. On write, validation or promotion failure, preserve the previous completed snapshot as recovery point.
 - After abrupt process failure, messages accepted after the latest successfully completed durable snapshot may be lost. A bounded crash-loss window is not yet agreed.
-- Snapshot interval configuration scope is settled: stream-class policy supplies the interval, with an optional per-stream override; one global scheduler evaluates each stream against its effective interval. Actual interval values remain unresolved.
+- Snapshot interval configuration and behaviour are settled: stream-class policy supplies a fixed interval, with an optional fixed per-stream override; one global scheduler evaluates each stream against its effective interval. Automatic activity/load-based interval adaptation is not used. Actual interval values remain unresolved.
 
 ### Current architectural decisions carried forward
 
@@ -966,6 +968,6 @@ The user has approved the three-dimensional retention model and oldest-first evi
 - Sequence continues from the last restored message after restart; a new process receives a new `runId`. A stream with no restored messages starts at sequence 1.
 - Broker owns retention of authoritative history. Replay reads from that history; subscriber delivery buffers are bounded, temporary and independent.
 - Core provides shared snapshot and persistence mechanisms for Broker-owned state. Snapshots capture defined Broker state; persistence durably stores selected snapshot data; restoration repopulates Broker's authoritative state before normal use.
-- Core uses one global periodic scheduler for persistence-enabled streams and snapshots only changed persisted state since the last successfully completed snapshot; there are no per-stream timers or synchronous per-publication snapshots. Each stream class supplies its snapshot interval as part of its policy, with an optional per-stream override; actual interval values remain undecided.
+- Core uses one global periodic scheduler for persistence-enabled streams and snapshots only changed persisted state since the last successfully completed snapshot; there are no per-stream timers or synchronous per-publication snapshots. Each stream class supplies a fixed snapshot interval as part of its policy, with an optional fixed per-stream override. Core does not automatically adapt intervals to publication activity or observed load; actual interval values remain undecided.
 - Actual snapshot interval values and a bounded crash-loss window remain open decisions. The global scheduling model, per-stream point-in-time snapshot boundary, atomic promotion, acceptance-versus-durability distinction and possible loss after the latest completed snapshot are settled.
 - Work remains architecture/design only: no implementation or scaffolding. Continue editing `steering.md` on `main`, preserving previously agreed decisions.

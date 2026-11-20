@@ -55,6 +55,20 @@ Broker is the one shared messaging and stream infrastructure. It owns registered
 
 A stream is the communication boundary. Components publish messages to streams and subscribe to streams. A publisher does not need to know which components subscribe; a subscriber does not need to know which component published. One stream may have many publishers and many subscribers. Fan-out semantics mean each authorised subscriber receives its own delivery of each message; this is not competing-consumer work-queue semantics.
 
+#### Message ordering and sequence ownership
+
+This is a settled Broker contract:
+
+- Each Broker stream has its own monotonically increasing message sequence.
+- The first accepted message in a stream receives sequence number `1`.
+- Broker assigns the sequence atomically at the point the message is accepted and appended to that stream's authoritative queue/log. Concurrent publishers therefore cannot create duplicate or ambiguous sequence numbers.
+- A rejected publication does not consume a sequence number.
+- Every subscriber receives messages in the stream's sequence order. Fan-out deliveries of the same published message retain the same stream sequence; sequence identity is independent of subscriber count.
+- Broker establishes the order once. Fan-out, delivery tracking, replay, gap reporting and tracing all refer to that same stream ordering; they must not introduce competing sequence authorities.
+- Sequence numbers are scoped to a Broker process run. The run identifier (`runId`) distinguishes message identities across process restarts.
+- Persistence and restoration must preserve unambiguous message identity and ordering. The exact sequence-continuity policy across a restart (including how restored stream state relates to the new run identifier) remains an explicit design detail to resolve before implementation; do not assume that a reset or continuation is correct without specifying its consequences.
+
+
 Internal and external messaging use the same Broker stream model and core messaging semantics. External access is an exposure and authorisation boundary, not a separate messaging architecture. Transport adapters may differ, but they must not create parallel stream, queue, subscription or persistence models.
 
 ### Messaging participants

@@ -45,7 +45,7 @@ This is the governing architecture for every subsystem. Subsystem-specific descr
 
 ### Core
 
-Core provides foundational capabilities shared across the system, including lifecycle and shutdown coordination, shared execution context, configuration, resource ownership, and reusable snapshot/persistence policy and mechanisms. Core is not a second message bus and does not own a parallel copy of Broker messages.
+Core is a shared foundational package, not a separate running service or messaging participant. It provides reusable capabilities used by subsystems across the system, including lifecycle and shutdown coordination, shared execution context, configuration, resource ownership, and snapshot/persistence policy and mechanisms. Core does not publish or subscribe to Broker streams, participate in domain workflows, act as a message bus, or own a parallel copy of Broker messages. It supports the subsystems; it does not sit in the message-delivery path.
 
 Core's snapshot and persistence facilities operate on state owned by the relevant subsystem. For stream message state, Broker is the authoritative owner of the stream, queue and published messages; Core supplies the shared snapshot/persistence capability and policy applied to that Broker-owned state. There must not be duplicate queue histories, per-subscriber message stores, or subsystem-specific persistence stores for data already owned by Broker.
 

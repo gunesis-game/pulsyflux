@@ -406,7 +406,7 @@ Pulsyflux cannot start if `PULSYFLUX_ADMIN_TOKEN` is missing or empty, so every 
 
 #### Stream selection
 
-The page retrieves the available stream list through the public, read-only `GET /v1/streams` operation; stream discovery does not require the Admin credential. The administrator must still authenticate as the global Admin subscriber through the standard bearer-credential model before reviewing pending Application subscribers, approved relationships or performing administration operations. Selecting a stream changes the target stream; it does not change or reissue the Admin credential.
+The page retrieves the available stream list through the public, read-only `GET /v1/streams` operation; stream discovery does not require the Admin credential. The administrator must still authenticate as the global Admin subscriber through the standard bearer-credential model before reviewing pending Application subscriber–stream requests, approved relationships or performing administration operations. Selecting a stream changes the target stream; it does not change or reissue the Admin credential.
 
 #### Pending and approved subscribers
 

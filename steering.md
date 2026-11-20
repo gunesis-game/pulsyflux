@@ -126,6 +126,8 @@ Standard `testing` package only.
 
 Authentication is built into Pulsyflux and uses one shared in-memory credential store and one bearer-token verification mechanism for all subscriber roles. The four roles are `Application`, `System`, `Security` and `Admin`.
 
+There is exactly one authentication and authorisation model throughout Pulsyflux: the standard subscriber model used by the internal Security subscriber and by ordinary publish and subscribe operations. Every operation that requires an authenticated identity or an authorisation decision must use this same model, shared credential store, credential verification, and identity/role/scope-based enforcement. HTTP routes, browser interfaces, administrative operations, stream discovery, schema retrieval, publishing, subscribing and tracing are not permitted to introduce a separate authentication mechanism, parallel authorisation framework, privileged bypass, or special-case trust path. Internal Security, System and Admin identities are represented within this same model; their different capabilities arise only from their trusted identity, role and scope. The Security bootstrap described below is the sole provisioning step needed to establish its reserved identity and credential in the shared store; it does not create an alternative authentication or authorisation model.
+
 - **Application:** an external subscriber approved for one Subscriber ID + Stream ID relationship.
 - **System:** a Pulsyflux-managed internal subscriber to a stream, such as Tracing. Pulsyflux creates and manages its identity and credential; external subscribers cannot claim this role.
 - **Security:** a reserved Pulsyflux-managed internal subscriber role for authentication and authorisation. Pulsyflux creates and manages its identity and credential at startup; external subscribers cannot request, claim, approve or impersonate this role.
@@ -348,7 +350,6 @@ The Security role is reserved and internal only. Pulsyflux creates its identity 
 ### Admin credential and startup
 
 There is no administrator username, password, account registration, separate browser session or administrator credential file.
-
 At startup Pulsyflux reads `PULSYFLUX_ADMIN_TOKEN`, which must contain a cryptographically random secret with at least 256 bits of entropy. Pulsyflux hashes it and creates exactly one global Admin credential record in memory. The raw token is not retained, logged, traced, exposed by an API or placed in a URL.
 
 The environment variable is mandatory. If it is missing or empty, Pulsyflux fails startup; it must never run without its single Admin record. The Admin record cannot be created, approved, duplicated or revoked through subscriber workflows. Changing the token requires restarting Pulsyflux.
@@ -697,7 +698,6 @@ One writer goroutine per stream owns its trace files. The recorder and writer ar
 On process shutdown, the recorder stops accepting new trace events, drains its queued events, emits any pending `trace.dropped` marker, flushes and closes the active file. On restart, recorders are recreated lazily when their streams are registered again; the recorder validates all retained trace files and records, then continues `traceSeq` after the highest retained value. If any retained file is unreadable or contains a malformed record, file tracing for that stream is disabled for the remainder of the process; no records are skipped, truncated, overwritten or appended, and no next sequence number is guessed. `/health` reports the affected stream as degraded, while the files remain untouched for operator inspection or repair.
 
 Tracing's internal subscriber automatically reconnects after a disconnect or crash using its reserved, startup-provisioned System identity and credential. It resubscribes through the ordinary subscription mechanism and replays retained authorisation events through the normal SSE replay mechanism. If required events have been evicted, the ordinary `stream.gap` mechanism exposes the missing range. Tracing recovery does not block Security or the core, and Tracing receives no special broker privileges or unlimited queue.
-
 When Tracing receives a `stream.gap` for its internal authorisation-event subscription, it records an explicit diagnostic in its own trace history identifying the affected source stream and missing sequence range. Tracing does not fabricate missing authorisation events or infer Security decisions. The gap places Tracing's health status in a degraded state.
 
 A recorded authorisation-event gap places Tracing's health status in a degraded state. The degraded warning clears automatically when Tracing successfully reconnects to its internal authorisation-event subscription. The gap diagnostic remains in trace history; reconnection does not recover or fabricate missing events.
@@ -1048,7 +1048,6 @@ Runs `go test ./...`.
 #### `make build`
 
 Runs `verify`, then `test`, then builds `dist/pulsyflux`.
-
 #### `make package`
 
 Builds the platform installer packages from the verified release binaries.

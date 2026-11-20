@@ -742,7 +742,7 @@ The user has approved a three-dimensional retention policy for each Broker-owned
 - These limits apply to Broker's authoritative stream history, not to per-subscriber delivery buffers.
 - The illustrative values 7 days, 100,000 messages and 500 MB are not approved defaults.
 
-The model and oldest-first ordering are settled. The precise enforcement schedule (immediate versus periodic), the storage-size accounting definition, individual-message maximum, and replay/gap behaviour at eviction boundaries remain open and must be decided separately.
+The model and oldest-first ordering are settled. The enforcement model is also settled as hybrid:\n\n- On every accepted publication, Broker enforces retention against that stream's authoritative history. This pass removes messages already past the age limit and enforces the configured message-count and storage-size limits, evicting oldest-first until all configured limits are satisfied.\n- A periodic maintenance pass independently checks streams for age expiry, including idle streams that receive no new publications. It evicts expired messages even when no publication occurs.\n- Both paths operate on the same authoritative history and apply the same retention rules; neither changes subscriber delivery-buffer ownership or semantics.\n- The maintenance interval and scheduling details are not yet decided.\n\nThe storage-size accounting definition, individual-message maximum, and replay/gap behaviour at eviction boundaries remain open and must be decided separately.
 
 
 ### Settled foundational architecture — Broker streams are the only component communication model
@@ -811,7 +811,7 @@ The user has approved the three-dimensional retention model and oldest-first evi
 - Enforcement applies to Broker's authoritative stream history, never subscriber delivery buffers.
 - The illustrative values 7 days, 100,000 messages and 500 MB are not approved defaults.
 
-**Next decision:** determine the enforcement schedule (immediate versus periodic), then separately settle storage-size accounting, individual-message maximum and replay/gap behaviour at eviction boundaries. Do not treat any of these remaining details as settled.
+**Next decision:** settle the storage-size accounting definition, then separately settle the individual-message maximum and replay/gap behaviour at eviction boundaries. The hybrid enforcement model is approved: enforce retention on each accepted publication and run periodic age-expiry maintenance so idle streams are covered. The maintenance interval remains open. Do not treat the remaining details as settled.
 
 ### Current architectural decisions carried forward
 

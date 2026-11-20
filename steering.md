@@ -55,6 +55,18 @@ Broker is the one shared messaging and stream infrastructure. It owns registered
 
 A stream is the communication boundary. Components publish messages to streams and subscribe to streams. A publisher does not need to know which components subscribe; a subscriber does not need to know which component published. One stream may have many publishers and many subscribers. Fan-out semantics mean each authorised subscriber receives its own delivery of each message; this is not competing-consumer work-queue semantics.
 
+#### Subscriber delivery-buffer overflow
+
+This is a settled Broker delivery policy:
+
+- Each subscriber has its own bounded, temporary delivery buffer. If that buffer becomes full, Broker detaches only the affected subscription.
+- A full subscriber buffer must not block publication to the stream or delivery to any other subscriber.
+- Broker must not silently discard messages to make room in a full delivery buffer.
+- Detaching a subscription does not alter, truncate or otherwise change the stream's authoritative message history, retention or sequence.
+- The subscriber may reconnect and resume from its last successfully delivered stream sequence. Replay uses Broker's authoritative retained history, not the former delivery buffer.
+- If retention has overtaken the subscriber's resume cursor, Broker reports the standard `stream.gap` semantics, identifies the earliest available sequence and resumes from the earliest retained message.
+- This policy applies uniformly to Application, Security, Tracing, Admin and other subscribers. Domain-specific correctness and failure handling remain the responsibility of the relevant participant; in particular, Security's established strict continuity and fail-closed requirements remain in force.
+
 #### Message ordering and sequence ownership
 
 This is a settled Broker contract:
@@ -813,9 +825,9 @@ The user has approved the three-dimensional retention model and oldest-first evi
 - Enforcement applies to Broker's authoritative stream history, never subscriber delivery buffers.
 - The illustrative values 7 days, 100,000 messages and 500 MB are not approved defaults.
 
-**Next step:** continue the Broker semantics review, taking one unresolved architectural decision at a time. All approved retention decisions are recorded above: three cumulative hard limits; oldest-first eviction; hybrid enforcement on each accepted publication plus one global age-expiry pass every minute; canonical serialized-byte accounting including the complete Broker envelope and stored metadata; a separate per-stream-class individual-message maximum; oversized publication rejection before append without eviction or sequence consumption; and explicit `stream.gap` reporting when a resume cursor predates the earliest retained message. Replay resumes at the earliest retained sequence and never silently returns incomplete history. Without a resume cursor, replay begins at the earliest retained message without a client-specific gap. Exact gap-event payload fields and wire representation remain a public-contract detail.
+**Next step:** continue the Broker semantics review, taking one unresolved architectural decision at a time. Subscriber delivery-buffer overflow is now settled: detach only the affected full subscription; do not block publication or other subscribers; do not silently drop messages; preserve authoritative history; and allow reconnect/replay from the last successfully delivered sequence, with standard `stream.gap` handling if retention has overtaken the cursor. All approved retention decisions are recorded above: three cumulative hard limits; oldest-first eviction; hybrid enforcement on each accepted publication plus one global age-expiry pass every minute; canonical serialized-byte accounting including the complete Broker envelope and stored metadata; a separate per-stream-class individual-message maximum; oversized publication rejection before append without eviction or sequence consumption; and explicit `stream.gap` reporting when a resume cursor predates the earliest retained message. Replay resumes at the earliest retained sequence and never silently returns incomplete history. Without a resume cursor, replay begins at the earliest retained message without a client-specific gap. Exact gap-event payload fields and wire representation remain a public-contract detail.
 
-**Current unresolved decision — subscriber delivery-buffer overflow:** the existing architecture establishes bounded, per-subscriber temporary delivery buffers, independent of Broker's authoritative retained history. The latest proposal (not yet approved by the user) is to detach only the subscription whose buffer becomes full; do not block publication or other subscribers, do not silently drop messages, and leave authoritative history unchanged. A detached subscriber may reconnect and resume from its last successfully delivered sequence; if retention has overtaken that cursor, the standard `stream.gap` behaviour applies. Ask the user whether they approve this policy before recording it as settled or proceeding to another decision.
+**Settled decision — subscriber delivery-buffer overflow:** the user approved detaching only the subscription whose bounded delivery buffer becomes full. Broker does not block publication or other subscribers, does not silently drop messages, and leaves authoritative history unchanged. The detached subscriber may reconnect and resume from its last successfully delivered sequence; if retention has overtaken that cursor, Broker reports the standard `stream.gap` behaviour and resumes from the earliest retained message. This policy applies uniformly across participants while preserving domain-specific correctness requirements, including Security's strict continuity and fail-closed behaviour.
 
 ### Current architectural decisions carried forward
 

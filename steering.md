@@ -890,15 +890,19 @@ Preserve the meaning and privacy requirements of TraceEvent and the agreed obser
 
 ### Where to resume
 
-The macro-architecture has been clarified, but the full document has not yet been reconciled section by section. The next task is to review the **Broker semantics** section against the architecture above and establish Broker's complete responsibilities and contracts: stream lifecycle, queue/message ownership, multiple publishers and subscribers, fan-out, ordering, routing/dispatch, subscription and delivery management, retention, replay/gap semantics, snapshots and persistence. Then review affected subsystem sections for conflicts, one architectural decision at a time.
+The macro-architecture has been clarified, but the full document has not yet been reconciled section by section. Continue the **Broker semantics** review against the architecture above, establishing Broker's complete responsibilities and contracts: stream lifecycle, queue/message ownership, multiple publishers and subscribers, fan-out, ordering, routing/dispatch, subscription and delivery management, retention, replay/gap semantics, snapshots and persistence. Then review affected subsystem sections for conflicts, one architectural decision at a time.
 
 Before proposing anything, read this handoff, the complete **Settled decisions** section, the complete **Open decisions** section, and the relevant Broker and subsystem sections. Treat this handoff's architecture as the current macro-level direction while preserving compatible settled domain decisions. Where an older settled bullet conflicts with the new ownership model, flag the conflict and reconcile it explicitly; do not silently apply both architectures.
 
-**Discussion rules:** Architecture/design only. Do not implement, scaffold, create code, or change other project files. Discuss exactly one architectural decision at a time. For each proposal, explain both subsystem-specific behaviour and macro-architectural implications. A proposal marked NOT settled remains open until the user explicitly agrees. After each agreement, update this file directly on `main`, preserve compatible prior decisions, clearly supersede conflicting obsolete wording, then fetch the committed file again to verify the change.
+**Discussion rules:** Architecture/design only. Do not implement, scaffold, create code, or change other project files. Discuss exactly one architectural decision at a time. For each proposal, explain both subsystem-specific behaviour and macro-architectural implications. A proposal remains open until the user explicitly agrees. After each agreement, update this file directly on `main`, preserve compatible prior decisions, clearly supersede conflicting obsolete wording, then fetch the committed file again to verify the change.
 
-**Last completed work:** The shared Broker/Core/participant architecture was added to the mission, foundational architecture, Broker semantics introduction, Storage, Tracing, package-layout guidance, Open decisions and this handoff. Tracing was reframed as a Broker participant. Older trace-specific persistence and cursor decisions were marked for supersession/reconciliation. The latest content must be verified from the current `main` branch before continuing; do not rely on commit identifiers from older handoffs.
+**Last completed work:** The shared Broker/Core/participant architecture was added to the mission, foundational architecture, Broker semantics introduction, Storage, Tracing, package-layout guidance, Open decisions and this handoff. Tracing was reframed as a Broker participant. Older trace-specific persistence and cursor decisions were marked for supersession/reconciliation. The Broker delivery, retention, replay, persistence and snapshot decisions listed below have also been approved and recorded. Always fetch the current `main` branch before continuing; do not rely on commit identifiers from older handoffs.
 
-**Resume instruction:** Start with Broker semantics. Do not jump back into implementing Tracing. First make the Broker contract coherent enough that Application, Security, Tracing and Admin can all use the same publish/subscribe infrastructure without direct component calls or subsystem-owned messaging/storage infrastructure.
+**Immediate next decision — snapshot interval configuration scope (NOT YET SETTLED):** Decide whether the interval for Core's global periodic snapshot scheduler is one global setting for every persistence-enabled stream, or is configurable by stream class with optional per-stream overrides. The scheduler itself is already settled as one global scheduler: it checks all persistence-enabled streams and snapshots only streams whose persisted state has changed since their last successfully completed snapshot. This outstanding question concerns interval configuration granularity only, not scheduler count or ownership. The user has not yet approved either option. Present one recommendation with its subsystem-specific and macro-architectural implications, then ask for approval. Do not silently choose or record a default.
+
+**Other remaining persistence decisions:** A bounded crash-loss window remains unresolved. Do not invent a numeric guarantee. Snapshot interval values are also undecided; settle configuration scope first, then discuss actual interval values separately. The snapshot boundary and atomic-promotion mechanisms are settled as described below.
+
+**Resume instruction:** Continue with the immediate next decision above. Do not jump back into implementing Tracing. Keep the work architecture/design only, and make the Broker contract coherent enough that Application, Security, Tracing and Admin can all use the same publish/subscribe infrastructure without direct component calls or subsystem-owned messaging/storage infrastructure.
 
 
 ## Session handoff — Broker retention limits
@@ -920,6 +924,38 @@ The user has approved the three-dimensional retention model and oldest-first evi
 **Settled decision — delivery confirmation and resume-cursor ownership:** each SSE event ID carries the Broker stream sequence; clients resume using their supplied `Last-Event-ID`; server write/flush success is not treated as proof of client receipt or processing; no explicit acknowledgement protocol or subscriber-owned message history is introduced. Existing replay and `stream.gap` semantics apply, while Security's strict continuity and fail-closed requirements remain in force.
 
 **Settled decision — subscriber delivery-buffer overflow:** the user approved detaching only the subscription whose bounded delivery buffer becomes full. Broker does not block publication or other subscribers, does not silently drop messages, and leaves authoritative history unchanged. The detached subscriber may reconnect and resume from its last successfully delivered sequence; if retention has overtaken that cursor, Broker reports the standard `stream.gap` behaviour and resumes from the earliest retained message. This policy applies uniformly across participants while preserving domain-specific correctness requirements, including Security's strict continuity and fail-closed behaviour.
+
+### Settled Broker/Core delivery, retention and persistence decisions
+
+**Subscriber delivery-buffer overflow**
+- Every subscriber has an independent bounded temporary delivery buffer. If one becomes full, Broker detaches only that subscription.
+- A full buffer never blocks stream publication or delivery to other subscribers. Broker never silently drops messages to make room.
+- Detachment does not alter authoritative history. The subscriber may reconnect and replay from its last received sequence using Broker history. If retention has overtaken its cursor, Broker reports the standard `stream.gap` and resumes at the earliest retained message.
+- Preserve domain-specific correctness, including Security's strict continuity and fail-closed requirements.
+
+**Delivery confirmation and resume cursor**
+- Each SSE event ID carries the Broker stream sequence. The client-supplied `Last-Event-ID` is the authoritative resume cursor.
+- Server-side write/flush success is only a transport observation, not proof of client receipt, acknowledgement or processing.
+- No separate per-message acknowledgement protocol or subscriber-owned message history is introduced.
+
+**Retention and replay**
+- Three independent cumulative hard limits apply to each authoritative stream history: maximum age, maximum retained message count and maximum retained storage size. They are configured by stream class with optional per-stream overrides; age is measured from Broker acceptance time.
+- Eviction is oldest-first and continues until all configured limits are satisfied. Retention applies to Broker history, not subscriber delivery buffers.
+- Enforce retention on every accepted publication and with one global age-expiry maintenance pass every minute, including idle streams.
+- Storage-size accounting uses canonical serialized bytes including the complete Broker envelope and stored metadata. A separate per-stream-class individual-message maximum applies.
+- Reject an oversized publication before append, without eviction or sequence consumption.
+- Replay uses authoritative retained history. A stale resume cursor produces explicit `stream.gap`; replay resumes at the earliest retained sequence and never silently returns incomplete history. Without a resume cursor, replay begins at the earliest retained message without a client-specific gap. Exact gap-event payload fields and wire representation remain a public-contract detail.
+- Illustrative values 7 days, 100,000 messages and 500 MB were not approved defaults.
+
+**Publication acceptance, snapshots and persistence**
+- Successful publication means in-memory acceptance and append to Broker's authoritative history, not durable persistence. Publication does not wait for snapshots.
+- Persistence is opt-in; non-opted-in streams remain non-persistent. Security authentication/authorisation state remains non-persistent, and plaintext bearer credentials are never snapshotted.
+- Core owns shared snapshot/persistence capabilities over Broker-owned state; no second authoritative message store is created. On restart, restore the latest successfully persisted snapshot before normal stream use. Sequence continues from the last restored message under existing sequence/`runId` rules; a stream without restored messages starts at sequence 1 and a new process receives a new `runId`.
+- One global periodic Core scheduler checks persistence-enabled streams and snapshots only streams whose persisted state changed since their last successfully completed snapshot. There are no per-stream timers and no synchronous per-publication snapshots.
+- Each snapshot is a consistent point-in-time state of one stream, identified by its highest included Broker sequence. Messages accepted after that boundary are excluded from the snapshot in progress and remain in authoritative history for a later snapshot. Publication is not blocked.
+- Snapshot completion requires the complete captured state to be persisted. Write a new snapshot separately, validate it, then atomically promote it as latest completed snapshot; retain the previous completed snapshot until promotion succeeds. On write, validation or promotion failure, preserve the previous completed snapshot as recovery point.
+- After abrupt process failure, messages accepted after the latest successfully completed durable snapshot may be lost. A bounded crash-loss window is not yet agreed.
+- Snapshot interval configuration scope and actual interval values remain unresolved. The scheduler's global nature is settled; do not confuse it with whether its interval setting is global, per stream class or overridable per stream.
 
 ### Current architectural decisions carried forward
 

@@ -413,7 +413,7 @@ The page retrieves the available stream list through the public, read-only `GET 
 
 #### Pending and approved subscribers
 
-Pending requests are held in memory and displayed with Subscriber ID and Name. The administrator can explicitly approve or reject each pending request.
+Admin owns the human administrative approval workflow and presents pending requests with Subscriber ID and Name for an explicit administrator decision. The administrator can approve or reject each pending request. Security separately owns authentication/authorisation state and the policy evaluation for the requesting subscriber, role and stream scope; Admin's human decision does not replace or perform Security's authorisation.
 
 An administrative approval/registration action may proceed only after Security has issued the required positive authorisation outcome for the Subscriber ID + Stream ID scope. Admin then initiates the authorised registration with Broker. Broker creates the runtime subscription and its unique `subscriptionId`; it does not make the policy decision, originate the registration workflow or hold an unapproved pending registration. The existing pending-request deadline, credential-delivery and connection rules remain governed by the settled Security authorisation contract.
 
@@ -472,7 +472,7 @@ generated/api/                     committed generated code
 internal/streamid/                 schema admission, JCS, hashing
 internal/broker/                   streams, seq, retention, replay, subscriber queues
 internal/service/                  implements api.Handler using broker and streamid
-internal/auth/                     internal authentication subscriber, in-memory pending approvals and subscriber–stream sessions, administrator-token validation, credentials, authorisation and revocation
+internal/auth/                     internal authentication subscriber, identity and credential handling, authorisation state, subscriber–stream sessions, administrator-token validation and revocation
 internal/core/                     shared lifecycle, execution context, configuration, snapshot and persistence capabilities
 internal/trace/                    Tracing messaging participant and trace-event interpretation; no independent stream queue, message history or persistence store
 internal/web/                      docs page (/), stream monitor page (/streams), authentication administration page, vendored assets
@@ -892,6 +892,17 @@ The model and oldest-first ordering are settled. The enforcement model is also s
 
 - On every accepted publication, Broker enforces retention against that stream's authoritative history. This pass removes messages already past the age limit and enforces the configured message-count and storage-size limits, evicting oldest-first until all configured limits are satisfied.\n- A periodic maintenance pass independently checks streams for age expiry, including idle streams that receive no new publications. It evicts expired messages even when no publication occurs.\n- Both paths operate on the same authoritative history and apply the same retention rules; neither changes subscriber delivery-buffer ownership or semantics.\n- A single global periodic maintenance pass runs once per minute and checks streams for age expiry, including idle streams. This is a system-wide pass, not a separately scheduled timer for each stream.\n\nStorage-size accounting is settled: Broker measures each message using the byte length of its canonical serialized representation, including the complete Broker message envelope and stored message metadata. The same per-message byte measurement is used both to calculate a stream's total retained storage size and to enforce the individual-message maximum. The accounting measures serialized authoritative message data, not subscriber delivery buffers, indexes, allocator overhead or other in-memory implementation costs. A separate maximum individual-message size is settled: it is configured by stream class with optional per-stream overrides; Broker checks it before appending a publication to authoritative history; an oversized publication is rejected without evicting existing retained history and without consuming a stream sequence number. Replay at eviction boundaries is settled: if a resume cursor predates the earliest retained event, Broker replays from the earliest retained event; evicted events are unavailable and no separate gap notification is sent. Without a resume cursor, replay begins at the earliest retained event.
 
+
+### Settled Admin/Security ownership of pending requests and human approval
+
+The user approved the separation between Security's authorisation responsibility and Admin's human administrative approval workflow:
+
+- Security owns authentication/authorisation state and evaluates the requesting subscriber, role and stream scope under its established policy. Security publishes the authorisation outcome through the existing Broker-stream workflow.
+- Admin owns the human administrative approval workflow. It presents pending requests to the administrator and coordinates the explicit human approval or rejection decision.
+- An administrative approval/registration action may proceed only when the required positive Security authorisation outcome and the required human administrative approval are both present.
+- Admin's human approval is not a Security authorisation decision. Security's positive authorisation is not a substitute for the administrator's human approval.
+- This separation does not move workflow or policy into Broker. Broker remains unaware of the request's meaning, the stream class and the workflow; it provides only generic stream and subscription mechanics.
+- Existing request/decision schemas, validation, deadlines, timeout handling, tombstones, recovery, credential handling and fail-closed behaviour remain unchanged. This decision clarifies responsibility ownership; it does not redesign those contracts.
 
 ### Settled Admin/Security subscription-registration responsibility
 

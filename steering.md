@@ -303,7 +303,7 @@ Trace consumers are ordinary Broker subscribers. Any consumer reconnection uses 
 
 ### Trace access API
 
-GET /v1/streams/{streamId}/trace remains the documented external trace access surface. It exposes Broker-owned trace messages for the requested tracing stream or stream scope; it is not an independent data source. External access uses the ordinary Application subscriber identity, approval, credential, stream-scope, revocation and rate-limiting rules. Internal Tracing uses its reserved System identity and the ordinary subscription mechanism. The API and built-in monitor must not bypass authentication or create a special trace-only authorisation path.
+GET /v1/streams/{streamId}/trace remains the documented external trace access surface. It exposes Broker-owned trace messages for the requested tracing stream or stream scope; it is not an independent data source. External access uses the ordinary Application subscriber identity, approval, credential, stream-scope, revocation and rate-limiting rules. Any internally provisioned Trace consumer uses its own ordinary identity and subscription mechanism; it has no special Broker privilege or trace-only authorisation path. The API and built-in monitor must not bypass authentication or create a special trace-only authorisation path.
 
 The exact relationship between the trace endpoint's streamId parameter, the tracing stream schema/identity, the trace event's source stream identifier and Broker's normal stream envelope must be made explicit in api/asyncapi.yaml before implementation. Do not imply that each source stream has an independently stored trace history unless that is deliberately represented as Broker-owned stream data.
 

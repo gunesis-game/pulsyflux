@@ -100,13 +100,13 @@ Served at `/`, with a "Try it" console generated from the contract.
 
 Tracing is enabled by default.
 
-Publish and subscription events for known streams are recorded per stream in a local JSON Lines file and exposed through the monitor page.
+Publish and subscription events for known streams are recorded per stream in a local JSON Lines file and exposed through the public trace API. The built-in `/streams` HTML viewer is an optional convenience client of that same API.
 
 A file-sink failure is reported by `/health`; it does not stop the bus.
 
 ### Monitor UI
 
-Served at `/streams`: stream list and live chronological trace per stream.
+Served at `/streams`: an optional, built-in HTML trace viewer for users who do not want to build their own client. It lists streams and displays the live chronological trace by consuming the public `GET /v1/streams/{streamId}/trace` SSE endpoint. It is a convenience UI, not a separate tracing capability or data source.
 
 ### Authentication administration UI
 
@@ -772,7 +772,7 @@ It is a concrete type with no interface, because there is only one implementatio
 
 ## Stream monitor page
 
-`/streams` serves a page that lists every stream and lets the user select one stream to view its live trace in chronological order.
+`/streams` serves an optional HTML trace viewer for PulsyFlux users who do not want to build their own monitoring interface. The page lists every stream and lets the user select one stream to view its live trace in chronological order. It is a browser client of the public `GET /v1/streams/{streamId}/trace` SSE operation; that operation remains the sole trace-data interface and source of truth. External clients may consume the same public API directly and are not required to use this page.
 
 ### Behaviour
 
@@ -838,7 +838,8 @@ Motion is subtle and turned off under `prefers-reduced-motion`.
 
 ### Rules
 
-- The page is embedded static HTML, CSS and JavaScript with no build step and no third-party libraries.
+- The page is embedded static HTML, CSS and JavaScript with no build step and no third-party libraries. Its browser-side SSE handling is private implementation code for this built-in viewer, not a separately served script, public SDK or client library.
+- Because Pause/Resume must explicitly set `Last-Event-ID` on a newly opened connection, the viewer uses fetch-based SSE consumption rather than relying on native `EventSource` for that reconnect. It still connects only to the public trace operation; no private trace endpoint or alternate trace protocol is introduced.
 - It loads nothing remote and is covered by the same same-origin CSP header as the docs page.
 - The page uses only contract operations: list streams, the trace operation and get schema.
 - It has no private endpoints.
@@ -1289,7 +1290,7 @@ Any newly identified decision that changes scope, externally visible behaviour o
 - Tracing is observational. Its per-stream recorder lifecycle, shutdown draining, reconnect/backoff, gap diagnostics, sink write/rotation failure behaviour, and startup retained-file integrity validation are settled. A failed or corrupt stream sink is disabled for the rest of the process; no unsafe retry, queue accumulation, truncation, overwrite, or guessed sequence is permitted. Other streams, the bus and Security continue unaffected.
 - Security's event-driven authorisation workflow, validation, deadlines, fail-closed handling, bounded workflow-owned tombstones, and recovery defaults are settled as recorded below. Preserve the distinction between Security's strict continuity requirement and Tracing's automatic warning clear after successful reconnection while retaining its gap diagnostic.
 
-**Next session's first task:** Continue the full-document consistency review one issue at a time, distinguishing contradictions from underspecified behaviour and editorial cleanup. The trace-cursor-below-retained-history decision has been agreed and recorded above. Read the complete **Settled decisions** section and preserve all prior decisions. Architecture/design discussion only; no implementation, scaffolding or code changes without explicit authorisation.
+**Next session's first task:** Continue the full-document consistency review one issue at a time, distinguishing contradictions from underspecified behaviour and editorial cleanup. The built-in `/streams` page is an optional HTML trace viewer for users who do not want to build their own interface; it consumes only the public `GET /v1/streams/{streamId}/trace` SSE operation. Its fetch-based SSE handling is internal to that page to support explicit Pause/Resume cursors, not a public SDK or separately served client. The trace-cursor-below-retained-history decision has also been agreed and recorded above. Read the complete **Settled decisions** section and preserve all prior decisions. Architecture/design discussion only; no implementation, scaffolding or code changes without explicit authorisation.
 
 **Recent completed review decisions:** The user agreed that a current-run message cursor ahead of the latest assigned sequence is invalid and causes the broker to replay all retained messages; a malformed message cursor has the same fallback, with no `stream.gap`. Subscription registration and replay-snapshot capture are atomic under the stream lock; the subscription owner delivers replay in `seq` order before queued live messages, using the existing bounded subscriber queue and overflow handling without holding the stream lock during sends. A malformed trace cursor replays all retained trace events from the earliest available event without emitting `trace.gap`. Earlier settled monitor Pause/resume semantics, trace future-cursor behaviour and message retention-gap boundaries remain unchanged.
 

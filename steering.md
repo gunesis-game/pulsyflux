@@ -122,7 +122,7 @@ This is a settled durability contract:
 - After an abrupt process failure, accepted messages newer than the latest successfully completed durable snapshot may be lost.
 - On restart, Broker restores the latest successfully persisted snapshot available for each opted-in stream before making that stream available for normal publication, subscription or replay. Its next sequence continues from the last restored message under the existing sequence/runId rules.
 - Streams without persistence opt-in remain non-persistent. Security authentication and authorisation state remains non-persistent under the existing policy.
-- This contract distinguishes in-memory acceptance from durable persistence. The snapshot boundary model is settled separately: each snapshot captures a consistent point-in-time state of one stream, identified by its highest included sequence; messages accepted after that boundary are excluded and remain eligible for a later snapshot. Write atomicity and a bounded crash-loss window remain open; the scheduling model is settled separately below.
+- This contract distinguishes in-memory acceptance from durable persistence. The snapshot boundary and atomic-promotion models are settled separately: each snapshot captures a consistent point-in-time state of one stream, identified by its highest included sequence; messages accepted after that boundary are excluded and remain eligible for a later snapshot. A new complete snapshot is persisted separately and promoted atomically, preserving the previous completed snapshot if writing or promotion fails. A bounded crash-loss window remains open; the scheduling model is settled separately below.
 
 #### Relationship between authoritative history, snapshots and persistence
 
@@ -135,7 +135,7 @@ This is a settled architectural relationship:
 - Persistence durably stores only the snapshot data selected by the applicable stream-class persistence policy and any explicit per-stream override.
 - On restoration, persisted stream data is restored into Broker's authoritative stream state before that state is made available for normal publication, subscription or replay.
 - Subscriber delivery buffers are temporary delivery state. They are not authoritative history and are not the source from which stream snapshots or persistence are produced.
-- This decision establishes ownership and the relationship between the mechanisms. Publication acceptance versus durable persistence, including the possibility of losing messages newer than the latest completed durable snapshot after abrupt failure, is settled separately above. The global snapshot scheduling model and snapshot boundary model are settled separately below; write atomicity and a bounded crash-loss window remain open decisions.
+- This decision establishes ownership and the relationship between the mechanisms. Publication acceptance versus durable persistence, including the possibility of losing messages newer than the latest completed durable snapshot after abrupt failure, is settled separately above. The global snapshot scheduling model, snapshot boundary model and atomic-promotion model are settled separately below; a bounded crash-loss window remains open.
 
 
 Internal and external messaging use the same Broker stream model and core messaging semantics. External access is an exposure and authorisation boundary, not a separate messaging architecture. Transport adapters may differ, but they must not create parallel stream, queue, subscription or persistence models.
@@ -784,7 +784,7 @@ The user approved one global periodic scheduler in Core for all streams opted in
 - Snapshot intervals are configurable; their values are not decided here.
 - Core performs this shared scheduling over Broker-owned state. Broker remains authoritative, and the previously settled asynchronous publication/durability contract remains unchanged.
 
-Snapshot interval values, write atomicity and a bounded crash-loss window remain open decisions.
+Snapshot interval values and a bounded crash-loss window remain open decisions.
 
 ### Settled Broker snapshot boundary model
 
@@ -794,7 +794,19 @@ The user approved a consistent per-stream point-in-time snapshot boundary:
 - Messages accepted before or at that boundary are included. Messages accepted after it are excluded from that snapshot, even if persistence is still in progress; those messages remain in Broker's authoritative history and are eligible for a later snapshot.
 - A snapshot is considered successfully completed only after its complete captured state has been persisted.
 - The boundary is per stream and does not make publication wait for snapshot writing. It works with the settled global periodic Core scheduler, which snapshots changed persistence-enabled streams.
-- This decision does not settle the storage write/commit atomicity mechanism or establish a bounded crash-loss window.
+- The atomic-promotion model is settled separately: write and validate a complete new snapshot separately, then atomically promote it while retaining the previous completed snapshot until promotion succeeds. A bounded crash-loss window remains open.
+
+### Settled Core snapshot write atomicity
+
+The user approved an atomic-promotion model for snapshots persisted by Core:
+
+- Write each new snapshot separately from the currently completed snapshot, using a temporary file or equivalent separate storage object.
+- Validate that the complete snapshot has been written successfully before promotion.
+- Promote the new snapshot atomically as the latest completed snapshot.
+- Keep the previous completed snapshot available until the new snapshot's promotion succeeds.
+- If writing, validation or promotion fails, the previous completed snapshot remains the recovery point; an incomplete snapshot must not replace it.
+- This is the shared Core persistence behaviour for persistence-enabled Broker streams. It does not change Broker's authoritative in-memory history, per-stream snapshot boundary, global scheduling model or asynchronous publication-acceptance contract.
+- This decision establishes atomic promotion and recovery-point preservation, not a bounded crash-loss window or a particular storage technology.
 
 ### Settled Broker publication acceptance and crash durability
 
@@ -805,7 +817,7 @@ The user approved the distinction between successful in-memory publication and d
 - After abrupt process failure, messages accepted after the latest successfully completed durable snapshot may be lost.
 - On restart, Broker restores the latest successfully persisted snapshot available for each opted-in stream before normal use. Sequence continues from the last restored message under the established sequence and `runId` rules.
 - Streams without persistence opt-in and Security authentication/authorisation state remain non-persistent.
-- Snapshot interval values, exact boundaries, write atomicity and a bounded crash-loss window remain open. The global scheduling model is settled below.
+- Snapshot interval values and a bounded crash-loss window remain open. The global scheduling, per-stream snapshot boundary and atomic-promotion models are settled separately.
 
 ### Settled Broker delivery confirmation and resume-cursor ownership
 
@@ -903,7 +915,7 @@ The user has approved the three-dimensional retention model and oldest-first evi
 
 **Next step:** continue the Broker semantics review, taking one unresolved architectural decision at a time. Publication acceptance versus crash durability is now settled: successful publication is in-memory acceptance, opted-in snapshots may be persisted asynchronously, and messages newer than the latest completed durable snapshot may be lost after abrupt failure. Subscriber delivery-buffer overflow and delivery confirmation/resume-cursor ownership are now settled: detach only the affected full subscription; do not block publication or other subscribers; do not silently drop messages; preserve authoritative history; and allow reconnect/replay from the last sequence the client received and supplied through `Last-Event-ID`, with standard `stream.gap` handling if retention has overtaken the cursor. Delivery confirmation is also settled: each SSE event ID carries the Broker stream sequence; the client-supplied `Last-Event-ID` is the resume cursor; server write/flush success is not proof of client receipt or processing; and no explicit acknowledgement protocol is added. All approved retention decisions are recorded above: three cumulative hard limits; oldest-first eviction; hybrid enforcement on each accepted publication plus one global age-expiry pass every minute; canonical serialized-byte accounting including the complete Broker envelope and stored metadata; a separate per-stream-class individual-message maximum; oversized publication rejection before append without eviction or sequence consumption; and explicit `stream.gap` reporting when a resume cursor predates the earliest retained message. Replay resumes at the earliest retained sequence and never silently returns incomplete history. Without a resume cursor, replay begins at the earliest retained message without a client-specific gap. Exact gap-event payload fields and wire representation remain a public-contract detail.
 
-**Settled decision — publication acceptance and crash durability:** a successful publication is in-memory acceptance, not durable persistence; opted-in snapshots may be persisted asynchronously without blocking publication; after abrupt failure, messages newer than the latest completed durable snapshot may be lost; restart restores the latest available persisted snapshot before normal stream use; non-opted-in streams and Security authentication/authorisation state remain non-persistent. Snapshot interval values, exact boundaries, write atomicity and a bounded crash-loss window remain open; the global scheduling model is settled separately.
+**Settled decision — publication acceptance and crash durability:** a successful publication is in-memory acceptance, not durable persistence; opted-in snapshots may be persisted asynchronously without blocking publication; after abrupt failure, messages newer than the latest completed durable snapshot may be lost; restart restores the latest available persisted snapshot before normal stream use; non-opted-in streams and Security authentication/authorisation state remain non-persistent. Snapshot interval values and a bounded crash-loss window remain open; the global scheduling, per-stream snapshot boundary and atomic-promotion models are settled separately.
 
 **Settled decision — delivery confirmation and resume-cursor ownership:** each SSE event ID carries the Broker stream sequence; clients resume using their supplied `Last-Event-ID`; server write/flush success is not treated as proof of client receipt or processing; no explicit acknowledgement protocol or subscriber-owned message history is introduced. Existing replay and `stream.gap` semantics apply, while Security's strict continuity and fail-closed requirements remain in force.
 
@@ -917,5 +929,5 @@ The user has approved the three-dimensional retention model and oldest-first evi
 - Broker owns retention of authoritative history. Replay reads from that history; subscriber delivery buffers are bounded, temporary and independent.
 - Core provides shared snapshot and persistence mechanisms for Broker-owned state. Snapshots capture defined Broker state; persistence durably stores selected snapshot data; restoration repopulates Broker's authoritative state before normal use.
 - Core uses one global periodic scheduler for persistence-enabled streams and snapshots only changed persisted state since the last successfully completed snapshot; there are no per-stream timers or synchronous per-publication snapshots. Interval values remain configurable.
-- Snapshot interval values, write atomicity and a bounded crash-loss window remain open decisions. The global scheduling model, per-stream point-in-time snapshot boundary, acceptance-versus-durability distinction and possible loss after the latest completed snapshot are settled.
+- Snapshot interval values and a bounded crash-loss window remain open decisions. The global scheduling model, per-stream point-in-time snapshot boundary, atomic promotion, acceptance-versus-durability distinction and possible loss after the latest completed snapshot are settled.
 - Work remains architecture/design only: no implementation or scaffolding. Continue editing `steering.md` on `main`, preserving previously agreed decisions.

@@ -1273,9 +1273,7 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 
 The former “Internal subscribers and the Security role” discussion has been reconciled with the authoritative settled decisions below. Internal subscriber identity and provisioning, the existing Security authorisation request/decision contracts and validation, delivery and failure behaviour, timeout handling, tombstone retention, and recovery are settled; they are not open design topics.
 
-One architectural decision remains open from the ongoing consistency review:
-
-- **Trace cursor below retained history:** For a syntactically valid trace cursor older than the earliest retained `traceSeq`, emit exactly one `trace.gap` covering the inclusive range `cursor + 1` through `earliestRetained - 1`, then replay from `earliestRetained`. The gap event's SSE ID is `toTraceSeq`, so reconnecting after the gap does not report the same missing range again. This is distinct from malformed trace cursors (which replay all retained events without a gap) and future trace cursors (which remain valid positions and wait for future events without a gap).
+No architectural decisions are currently open. The trace-cursor-below-retained-history behaviour described in Settled decisions was explicitly agreed and is no longer an open topic.
 
 Any newly identified decision that changes scope, externally visible behaviour or an acceptance criterion must be discussed and explicitly agreed before it is added to **Settled decisions**. Do not infer or silently settle decisions.
 

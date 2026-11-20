@@ -66,7 +66,7 @@ This is a settled Broker contract:
 - Every subscriber receives messages in the stream's sequence order. Fan-out deliveries of the same published message retain the same stream sequence; sequence identity is independent of subscriber count.
 - Broker establishes the order once. Fan-out, delivery tracking, replay, gap reporting and tracing all refer to that same stream ordering; they must not introduce competing sequence authorities.
 - Sequence numbers are scoped to a Broker process run. The run identifier (`runId`) distinguishes message identities across process restarts.
-- Persistence and restoration must preserve unambiguous message identity and ordering. The exact sequence-continuity policy across a restart (including how restored stream state relates to the new run identifier) remains an explicit design detail to resolve before implementation; do not assume that a reset or continuation is correct without specifying its consequences.
+- Persistence and restoration preserve unambiguous message identity and ordering. When a persisted stream is restored, its sequence continues from the last restored message: the next accepted message receives the previous sequence plus one. The new process uses a new `runId`, distinguishing message identities across process runs while the stream sequence remains continuous. If no messages are restored for a stream, its first accepted message receives sequence number `1`.
 
 
 Internal and external messaging use the same Broker stream model and core messaging semantics. External access is an exposure and authorisation boundary, not a separate messaging architecture. Transport adapters may differ, but they must not create parallel stream, queue, subscription or persistence models.

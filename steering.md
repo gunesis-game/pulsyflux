@@ -481,7 +481,7 @@ Returns readiness and stream/subscriber counts.
 Authentication uses a single bearer-credential mechanism and in-memory credential store for all four roles: `Application`, `System`, `Security` and `Admin`. `Security` is reserved and internally provisioned by Pulsyflux; external subscribers cannot request or claim it. The contract must define subscriber identity fields, credential issuance and presentation, and role-based authorisation behaviour.
 
 Administration operations must cover:
-- Discovering available streams using the global Admin credential.
+- Discovering available streams through the public, read-only `GET /v1/streams` operation, which requires no authentication and is not rate limited.
 - Retrieving pending Application subscribers and approved relationships for a selected stream.
 - Approving or rejecting a pending Application subscriber–stream relationship.
 - Revoking an approved Application subscriber–stream relationship.

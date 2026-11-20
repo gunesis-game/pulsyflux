@@ -985,6 +985,23 @@ Preserve the meaning and privacy requirements of TraceEvent and the agreed obser
 ### Where to resume
 ### Current review progress and next-session instructions
 
+**Latest completed decision — Trace is a peer stream class (2026-11-20):**
+
+The user explicitly confirmed: “only events published by the other stream classes, excluding Broker-only lifecycle observations, Broker should never directly know about stream classes.” This is now the governing Trace architecture and supersedes every older handoff statement below or elsewhere that describes Tracing as a Broker participant, central observer, source-stream subscriber, or event translator.
+
+- Trace is a peer stream class alongside the other stream classes, not a separate recorder participant or Broker subsystem.
+- Application, Security, Admin and other stream-class participants publish their own trace-relevant events to Trace streams, based only on facts they know and own within their responsibilities. Trace consumers subscribe through ordinary Broker mechanisms.
+- Broker is entirely unaware of stream classes. It handles only generic stream and message mechanics; it does not identify Trace streams, interpret trace-event meaning, observe domain/stream-class lifecycle, or publish directly to Trace.
+- Broker-only lifecycle observations are excluded from Trace, including schema registration, publish acceptance/rejection, subscription opening/closure, delivery and subscriber-buffer overflow. A participant may publish its own domain-level outcome about a publication or workflow when that is genuinely part of its responsibility; this must not be confused with Broker reporting transport mechanics.
+- There is no central Tracing participant that subscribes to source streams and translates or republishes their events. No Tracing-owned history, queue, persistence worker, JSONL store, file rotation, snapshot or restore path is introduced.
+- Trace subscribers use ordinary subscription/replay behaviour. Any internally provisioned Trace consumer has an ordinary identity and no special Broker privilege. The trace API and monitor consume Broker-owned Trace stream data under the established authentication/authorisation rules.
+- Existing TraceEvent privacy requirements and Broker-authoritative stream sequence/replay rules remain. Trace-event schema compatibility, trace API addressing and source-stream identifiers still require explicit reconciliation in the AsyncAPI contract before implementation; do not invent a second sequence/history.
+
+**Change record:** This decision was implemented only in `steering.md` on `main` in commits `308906a20a4351b2535ccc092c1ca7dc029d00f0` and `8240323b1e99cc2f319bf4364fb2842e2d7ce187`. The latter was fetched again and verified; only `steering.md` changed. The verified main file blob at that point was `377ec0bf1f57d47827076fdcb40aca814a262078`. Always fetch current `main` before continuing; do not rely on this blob as current if subsequent changes exist.
+
+**Next session:** Read this latest Trace decision first, then fetch current `main`, review the complete Settled decisions and Open decisions sections and relevant source sections. Continue the broader source-led review at the next unresolved architectural inconsistency, one issue at a time. Do not reopen the Trace decision or any other settled workflow without explicit user direction. For each new issue, quote/summarise the conflicting source wording, propose the smallest alignment, and wait for explicit approval before editing. After approval, edit only `steering.md` on `main`, commit, fetch again and verify. Architecture/design only: no implementation, scaffolding, code/tests, PRs/issues or unrelated file changes.
+
+
 The user requested a comprehensive review of the current `steering.md` to align all previously agreed workflows and responsibilities with the current shared-Broker architecture. The missing-bearer-token example was explicitly identified by the user as only one example of an authentication flow; do not limit the review to that example or assume it is the only exceptional path.
 
 **Resume the review in the next session as follows:**

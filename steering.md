@@ -69,6 +69,17 @@ This is a settled Broker contract:
 - Persistence and restoration preserve unambiguous message identity and ordering. When a persisted stream is restored, its sequence continues from the last restored message: the next accepted message receives the previous sequence plus one. The new process uses a new `runId`, distinguishing message identities across process runs while the stream sequence remains continuous. If no messages are restored for a stream, its first accepted message receives sequence number `1`.
 
 
+#### Retention ownership and authoritative stream history
+
+This is a settled Broker ownership decision:
+
+- Broker owns each stream's authoritative message history: the official ordered record of messages accepted into that stream. It is the single source of truth for the stream's retained messages.
+- Broker applies the configured retention policy to that authoritative history. This decision establishes ownership, not a universal retention duration or a specific eviction threshold; those details remain subject to the stream-class policy and any per-stream override.
+- Replay reads from the authoritative stream history, subject to the messages still retained under the applicable policy. Subscriber delivery buffers are not replay sources and do not determine authoritative-history retention.
+- Per-subscriber delivery buffers remain bounded, temporary delivery state. They may contain only a subset of the stream's messages and may be drained, discarded or lost independently without changing the authoritative history.
+- There is one authoritative history per stream, shared as the source for all authorised subscribers; there are no subscriber-specific retained histories or subsystem-owned copies.
+
+
 Internal and external messaging use the same Broker stream model and core messaging semantics. External access is an exposure and authorisation boundary, not a separate messaging architecture. Transport adapters may differ, but they must not create parallel stream, queue, subscription or persistence models.
 
 ### Messaging participants

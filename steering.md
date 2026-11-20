@@ -331,19 +331,18 @@ The page refreshes the stream list by polling `GET /v1/streams` every 2 seconds.
 The initial contract has no separate stream-list SSE operation.
 
 #### Stream view
-Selecting a card opens only that stream's trace from `GET /v1/streams/{streamId}/trace` as a vertical timeline, newest at the bottom, with auto-scroll that pauses when the user scrolls up. The page maintains one active trace SSE connection for the selected stream; selecting another stream switches the view and connection to that stream.
+
+Selecting a card opens only that stream's trace from `GET /v1/streams/{streamId}/trace` as a vertical timeline of trace events published by their owning participants, newest at the bottom, with auto-scroll that pauses when the user scrolls up. The page maintains one active trace SSE connection for the selected stream; selecting another stream switches the view and connection to that stream. The timeline does not assume that Broker publishes transport, delivery or subscription-lifecycle observations.
 
 #### Controls
 
-- Filters by event kind and subscription. When a subscription filter is active, the page shows events belonging to that subscription and retains the corresponding `publish.accepted` events as context when they share the same `runId` and message `seq` with a visible `delivery`. It hides unrelated publishes and deliveries from other subscriptions. Filtering changes presentation only; it does not change Broker messages or their stream order.
+- Filters by event kind and, where participant-owned trace data provides it, subscription identity. Filtering changes presentation only; it does not change Broker messages or their stream order. The monitor does not synthesize publish-to-delivery relationships or add Broker lifecycle events as context.
 - Pause closes the selected stream's trace SSE connection and retains the most recently received Broker SSE event ID as the resume cursor.
 - Resume opens a new trace SSE connection using the retained cursor in the standard `Last-Event-ID` HTTP header.
 - Replay follows Broker's standard retained-history and cursor semantics. Events already evicted are unavailable; replay begins at the earliest retained event when the cursor predates it.
 - Jump to the selected Broker stream sequence.
 
-The page consumes trace messages through the documented Broker-backed trace API only. It does not read persistence files, maintain a second history or invent a private replay mechanism.
-
-
+The page consumes trace messages through the documented Broker-backed trace API only. It displays only trace events legitimately published by their owning participants. It does not read persistence files, maintain a second history, infer Broker transport activity, or invent a private replay mechanism.
 
 ### Visual design
 
@@ -353,17 +352,9 @@ Each stream gets a colour and a small generated pattern derived from its hash by
 
 The same stream always looks the same, and two streams are easy to tell apart.
 
-The timeline uses two lanes:
+The timeline presents participant-owned trace events in Broker sequence order. It does not use separate publish and delivery lanes, publish-to-delivery connectors, or subscription opening/closing markers, because those would depend on Broker-only lifecycle observations that the Trace architecture excludes.
 
-- Publishes on the left.
-- Deliveries on the right, grouped by subscription.
-
-A thin connector links each `publish.accepted` to its `delivery` events, so you can see which subscribers a message reached and how long it took (the `at` difference).
-
-Each kind has its own colour and icon:
-
-- Rejected publishes and subscription overflows stand out.
-- Opened and closed subscriptions mark the start and end of that subscription's lane.
+Each trace event kind has its own colour and icon. Participant-reported failures or Security decisions may stand out when represented by trace events published by the participant that owns those facts.
 
 Light and dark themes follow `prefers-color-scheme`.
 

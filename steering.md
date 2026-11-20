@@ -55,6 +55,17 @@ Broker is the one shared messaging and stream infrastructure. It owns registered
 
 A stream is the communication boundary. Components publish messages to streams and subscribe to streams. A publisher does not need to know which components subscribe; a subscriber does not need to know which component published. One stream may have many publishers and many subscribers. Fan-out semantics mean each authorised subscriber receives its own delivery of each message; this is not competing-consumer work-queue semantics.
 
+#### Delivery confirmation and resume-cursor ownership
+
+This is a settled Broker delivery contract:
+
+- Each delivered message exposes its authoritative Broker stream sequence as its SSE event ID.
+- A subscriber's client-supplied `Last-Event-ID` is the authoritative resume cursor. On reconnection, the subscriber supplies the last sequence it received, and Broker resumes from that cursor using the stream's authoritative retained history.
+- Successful server-side writing and flushing of an SSE frame is a transport-delivery observation only. It does not establish that the client received, acknowledged or processed the message.
+- Broker does not add a separate per-message acknowledgement protocol or a subscriber-owned message history for this purpose.
+- Replay and retention-gap handling continue to use the established Broker stream sequence and standard `stream.gap` semantics. A stale cursor is handled by the existing explicit gap-and-resume rule.
+- This contract applies uniformly to Application, Security, Tracing, Admin and other subscribers. It does not weaken domain-specific correctness requirements; Security's established strict continuity and fail-closed behaviour remain in force.
+
 #### Subscriber delivery-buffer overflow
 
 This is a settled Broker delivery policy:
@@ -742,6 +753,17 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 
 ## Open decisions
 
+### Settled Broker delivery confirmation and resume-cursor ownership
+
+The user approved using the client's `Last-Event-ID` as the authoritative resume cursor without introducing explicit per-message acknowledgements:
+
+- Each delivered message carries its authoritative Broker stream sequence as its SSE event ID.
+- On reconnect, the subscriber supplies the last sequence it received through `Last-Event-ID`; Broker resumes from that cursor using authoritative retained stream history.
+- A successful server-side write and flush is only a transport-delivery observation. It is not proof that the client received, acknowledged or processed the message.
+- No separate acknowledgement protocol or subscriber-owned message history is introduced.
+- Existing Broker replay and explicit `stream.gap` behaviour govern cursor recovery and retention gaps.
+- The rule applies to all participants and preserves domain-specific correctness requirements, including Security's strict continuity and fail-closed behaviour.
+
 ### Settled Broker retention model and eviction ordering
 
 The user has approved a three-dimensional retention policy for each Broker-owned authoritative stream history:
@@ -825,7 +847,9 @@ The user has approved the three-dimensional retention model and oldest-first evi
 - Enforcement applies to Broker's authoritative stream history, never subscriber delivery buffers.
 - The illustrative values 7 days, 100,000 messages and 500 MB are not approved defaults.
 
-**Next step:** continue the Broker semantics review, taking one unresolved architectural decision at a time. Subscriber delivery-buffer overflow is now settled: detach only the affected full subscription; do not block publication or other subscribers; do not silently drop messages; preserve authoritative history; and allow reconnect/replay from the last successfully delivered sequence, with standard `stream.gap` handling if retention has overtaken the cursor. All approved retention decisions are recorded above: three cumulative hard limits; oldest-first eviction; hybrid enforcement on each accepted publication plus one global age-expiry pass every minute; canonical serialized-byte accounting including the complete Broker envelope and stored metadata; a separate per-stream-class individual-message maximum; oversized publication rejection before append without eviction or sequence consumption; and explicit `stream.gap` reporting when a resume cursor predates the earliest retained message. Replay resumes at the earliest retained sequence and never silently returns incomplete history. Without a resume cursor, replay begins at the earliest retained message without a client-specific gap. Exact gap-event payload fields and wire representation remain a public-contract detail.
+**Next step:** continue the Broker semantics review, taking one unresolved architectural decision at a time. Subscriber delivery-buffer overflow and delivery confirmation/resume-cursor ownership are now settled: detach only the affected full subscription; do not block publication or other subscribers; do not silently drop messages; preserve authoritative history; and allow reconnect/replay from the last successfully delivered sequence, with standard `stream.gap` handling if retention has overtaken the cursor. Delivery confirmation is also settled: each SSE event ID carries the Broker stream sequence; the client-supplied `Last-Event-ID` is the resume cursor; server write/flush success is not proof of client receipt or processing; and no explicit acknowledgement protocol is added. All approved retention decisions are recorded above: three cumulative hard limits; oldest-first eviction; hybrid enforcement on each accepted publication plus one global age-expiry pass every minute; canonical serialized-byte accounting including the complete Broker envelope and stored metadata; a separate per-stream-class individual-message maximum; oversized publication rejection before append without eviction or sequence consumption; and explicit `stream.gap` reporting when a resume cursor predates the earliest retained message. Replay resumes at the earliest retained sequence and never silently returns incomplete history. Without a resume cursor, replay begins at the earliest retained message without a client-specific gap. Exact gap-event payload fields and wire representation remain a public-contract detail.
+
+**Settled decision — delivery confirmation and resume-cursor ownership:** each SSE event ID carries the Broker stream sequence; clients resume using their supplied `Last-Event-ID`; server write/flush success is not treated as proof of client receipt or processing; no explicit acknowledgement protocol or subscriber-owned message history is introduced. Existing replay and `stream.gap` semantics apply, while Security's strict continuity and fail-closed requirements remain in force.
 
 **Settled decision — subscriber delivery-buffer overflow:** the user approved detaching only the subscription whose bounded delivery buffer becomes full. Broker does not block publication or other subscribers, does not silently drop messages, and leaves authoritative history unchanged. The detached subscriber may reconnect and resume from its last successfully delivered sequence; if retention has overtaken that cursor, Broker reports the standard `stream.gap` behaviour and resumes from the earliest retained message. This policy applies uniformly across participants while preserving domain-specific correctness requirements, including Security's strict continuity and fail-closed behaviour.
 

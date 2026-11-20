@@ -124,7 +124,7 @@ This is a settled architectural relationship:
 - Persistence durably stores only the snapshot data selected by the applicable stream-class persistence policy and any explicit per-stream override.
 - On restoration, persisted stream data is restored into Broker's authoritative stream state before that state is made available for normal publication, subscription or replay.
 - Subscriber delivery buffers are temporary delivery state. They are not authoritative history and are not the source from which stream snapshots or persistence are produced.
-- This decision establishes ownership and the relationship between the mechanisms. It does not yet define snapshot frequency, persistence timing, exact snapshot boundaries, crash-loss windows or detailed crash-recovery guarantees; those remain separate decisions.
+- This decision establishes ownership and the relationship between the mechanisms. Publication acceptance versus durable persistence, including the possibility of losing messages newer than the latest completed durable snapshot after abrupt failure, is settled separately above. Snapshot frequency and scheduling, exact snapshot boundaries, write atomicity and a bounded crash-loss window remain open decisions.
 
 
 Internal and external messaging use the same Broker stream model and core messaging semantics. External access is an exposure and authorisation boundary, not a separate messaging architecture. Transport adapters may differ, but they must not create parallel stream, queue, subscription or persistence models.

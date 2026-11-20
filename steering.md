@@ -126,7 +126,7 @@ Standard `testing` package only.
 
 Authentication is built into Pulsyflux and uses one shared in-memory credential store and one bearer-token verification mechanism for all subscriber roles. The four roles are `Application`, `System`, `Security` and `Admin`.
 
-There is exactly one authentication and authorisation model throughout Pulsyflux: the standard subscriber model used by the internal Security subscriber and by ordinary publish and subscribe operations. Every operation that requires an authenticated identity or an authorisation decision must use this same model, shared credential store, credential verification, and identity/role/scope-based enforcement. HTTP routes, browser interfaces, administrative operations, schema retrieval, publishing, subscribing and tracing are not permitted to introduce a separate authentication mechanism, parallel authorisation framework, privileged bypass, or special-case trust path. The read-only `GET /v1/streams` discovery operation is explicitly public and does not require authentication or rate limiting; this grants no access to privileged operations. Internal Security, System and Admin identities are represented within this same model; their different capabilities arise only from their trusted identity, role and scope. The Security bootstrap described below is the sole provisioning step needed to establish its reserved identity and credential in the shared store; it does not create an alternative authentication or authorisation model.
+There is exactly one authentication and authorisation model throughout Pulsyflux: the standard subscriber model used by the internal Security subscriber and by ordinary publish and subscribe operations. Every operation that requires an authenticated identity or an authorisation decision must use this same model, shared credential store, credential verification, and identity/role/scope-based enforcement. HTTP routes, browser interfaces, administrative operations, schema retrieval, publishing, subscribing and tracing are not permitted to introduce a separate authentication mechanism, parallel authorisation framework, privileged bypass, or special-case trust path. The read-only `GET /v1/streams` discovery operation and `GET /v1/streams/{streamId}/schema` schema retrieval operation are explicitly public and do not require subscriber authentication; this grants no access to privileged operations. Both remain subject to the universal API rate-limiting requirement. Internal Security, System and Admin identities are represented within this same model; their different capabilities arise only from their trusted identity, role and scope. The Security bootstrap described below is the sole provisioning step needed to establish its reserved identity and credential in the shared store; it does not create an alternative authentication or authorisation model.
 
 - **Application:** an external subscriber approved for one Subscriber ID + Stream ID relationship.
 - **System:** a Pulsyflux-managed internal subscriber to a stream, such as Tracing. Pulsyflux creates and manages its identity and credential; external subscribers cannot claim this role.
@@ -400,6 +400,10 @@ This is the starting point for the spec, not the final contract.
 
 All paths are under `/v1`.
 
+### API rate limiting
+
+Every API endpoint is subject to rate limiting. There are no exemptions for public, read-only or discovery endpoints: this includes schema retrieval, stream listing, health, request/response operations and requests that establish SSE connections. Public endpoints remain unauthenticated where specified; rate limiting is an independent traffic-control measure, not an authentication or authorisation mechanism. The rate-limit policy must define applicable thresholds and accounting scope before implementation, and rate-limit rejections must use the documented HTTP `429 Too Many Requests` response where the response has not already transitioned to SSE.
+
 ### Register schema
 
 `PUT /v1/schemas`
@@ -414,7 +418,7 @@ Idempotent: registering the same schema again returns the same ID.
 
 `GET /v1/streams/{streamId}/schema`
 
-Returns the registered schema so any client can recompute and check the hash.
+Public, read-only schema discovery. It requires no subscriber authentication and returns the registered JSON Schema so any client can recompute and verify the stream ID. It grants no publish, subscribe or administration permissions. The endpoint remains subject to the universal API rate-limiting requirement.
 
 ### Publish
 
@@ -450,7 +454,7 @@ The Admin UI presents the global Admin bearer credential through the same authen
 
 `GET /v1/streams`
 
-This is a public, read-only stream-discovery operation. It does not require authentication and is not rate limited. It exposes registered stream metadata and aggregate operational counts only; it does not grant access to publish, subscribe, administer relationships or perform any other privileged operation. Its public-read behaviour is not a second authentication or authorisation model.
+This is a public, read-only stream-discovery operation. It does not require subscriber authentication. It exposes registered stream metadata and aggregate operational counts only; it does not grant access to publish, subscribe, administer relationships or perform any other privileged operation. Its public-read behaviour is not a second authentication or authorisation model. The endpoint is subject to the universal API rate-limiting requirement.
 
 Returns every registered stream with:
 
@@ -481,7 +485,7 @@ Returns readiness and stream/subscriber counts.
 Authentication uses a single bearer-credential mechanism and in-memory credential store for all four roles: `Application`, `System`, `Security` and `Admin`. `Security` is reserved and internally provisioned by Pulsyflux; external subscribers cannot request or claim it. The contract must define subscriber identity fields, credential issuance and presentation, and role-based authorisation behaviour.
 
 Administration operations must cover:
-- Discovering available streams through the public, read-only `GET /v1/streams` operation, which requires no authentication and is not rate limited.
+- Discovering available streams through the public, read-only `GET /v1/streams` operation, which requires no subscriber authentication and remains subject to API rate limiting.
 - Retrieving pending Application subscribers and approved relationships for a selected stream.
 - Approving or rejecting a pending Application subscriber–stream relationship.
 - Revoking an approved Application subscriber–stream relationship.
@@ -1274,7 +1278,7 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 
 The former “Internal subscribers and the Security role” discussion has been reconciled with the authoritative settled decisions below. Internal subscriber identity and provisioning, the existing Security authorisation request/decision contracts and validation, delivery and failure behaviour, timeout handling, tombstone retention, and recovery are settled; they are not open design topics.
 
-No architectural decisions are currently open. The trace-cursor-below-retained-history behaviour described in Settled decisions was explicitly agreed and is no longer an open topic.
+The universal requirement that every API endpoint is rate limited, including public read-only endpoints and SSE connection-establishment requests, is settled. The exact rate-limit thresholds and accounting scope remain to be specified before implementation. The trace-cursor-below-retained-history behaviour described in Settled decisions was explicitly agreed and is no longer an open topic.
 
 Any newly identified decision that changes scope, externally visible behaviour or an acceptance criterion must be discussed and explicitly agreed before it is added to **Settled decisions**. Do not infer or silently settle decisions.
 
@@ -1290,7 +1294,7 @@ Any newly identified decision that changes scope, externally visible behaviour o
 - Tracing is observational. Its per-stream recorder lifecycle, shutdown draining, reconnect/backoff, gap diagnostics, sink write/rotation failure behaviour, and startup retained-file integrity validation are settled. A failed or corrupt stream sink is disabled for the rest of the process; no unsafe retry, queue accumulation, truncation, overwrite, or guessed sequence is permitted. Other streams, the bus and Security continue unaffected.
 - Security's event-driven authorisation workflow, validation, deadlines, fail-closed handling, bounded workflow-owned tombstones, and recovery defaults are settled as recorded below. Preserve the distinction between Security's strict continuity requirement and Tracing's automatic warning clear after successful reconnection while retaining its gap diagnostic.
 
-**Next session's first task:** Continue the full-document consistency review one issue at a time, distinguishing contradictions from underspecified behaviour and editorial cleanup. The latest discussion clarified that `/streams` is an optional HTML trace viewer served by PulsyFlux for users who do not want to build their own interface. It must consume only the public `GET /v1/streams/{streamId}/trace` SSE operation; that endpoint remains the sole trace-data interface and source of truth. Its fetch-based SSE handling is internal to the page to support explicit Pause/Resume cursors, not a public SDK, separately served script or client library. External developers may build their own viewers against the same public API. The user agreed to this architecture, and it is recorded in the authoritative sections. Next review the authentication/access behaviour of `/streams` and how it obtains access to the selected stream's trace; discuss exactly one architectural decision at a time and do not assume the viewer is unauthenticated or privileged. Read the complete **Settled decisions** section and preserve all prior decisions. Architecture/design discussion only: no implementation, scaffolding or code changes without explicit authorisation.
+**Next session's first task:** Continue the full-document consistency review one issue at a time, distinguishing contradictions from underspecified behaviour and editorial cleanup. The user has confirmed that stream listing and schema retrieval are public, read-only discovery operations that require no subscriber authentication, and that every API endpoint must be rate limited, including public discovery and SSE connection-establishment requests. The exact rate-limit thresholds and accounting scope remain to be specified before implementation. Preserve the single shared authentication and authorisation model: no separate mechanism, privileged bypass or internal-role exemption. Read the complete **Settled decisions** section and preserve all prior decisions. Architecture/design only: no implementation, scaffolding or code changes without explicit authorisation.
 
 **Recent completed review decisions:** The user agreed that a current-run message cursor ahead of the latest assigned sequence is invalid and causes the broker to replay all retained messages; a malformed message cursor has the same fallback, with no `stream.gap`. Subscription registration and replay-snapshot capture are atomic under the stream lock; the subscription owner delivers replay in `seq` order before queued live messages, using the existing bounded subscriber queue and overflow handling without holding the stream lock during sends. A malformed trace cursor replays all retained trace events from the earliest available event without emitting `trace.gap`. Earlier settled monitor Pause/resume semantics, trace future-cursor behaviour and message retention-gap boundaries remain unchanged.
 
@@ -1304,6 +1308,7 @@ The following points are settled by this steering file and are not open decision
 - First-release stream and message storage is in-memory and is lost on process exit.
 - All authentication and authorisation state is held in memory only; no authentication files are created or read.
 - Authentication uses one shared in-memory credential store and one bearer-token verification mechanism for all subscriber roles.
+- Every API endpoint is rate limited, including public read-only discovery endpoints, health and SSE connection-establishment requests. Rate limiting is independent of subscriber authentication and authorisation; concrete thresholds and accounting scope must be specified before implementation.
 - The four roles are `Application`, `System`, `Security` and `Admin`.
 - Application subscribers are external subscribers approved independently for each Subscriber ID + Stream ID relationship.
 - System subscribers are Pulsyflux-managed internal subscribers to a stream; external clients cannot claim the System role.

@@ -56,7 +56,9 @@ This is a settled Core scheduling model:
 - Core uses one global periodic snapshot scheduler for all streams whose persistence policy is enabled.
 - The scheduler checks eligible streams and snapshots only streams whose persisted state has changed since their last successfully completed snapshot.
 - There are no separate per-stream snapshot timers, and publication does not trigger a synchronous snapshot.
-- Snapshot interval values remain configurable and are not set by this decision.
+- The snapshot interval is part of the policy provided by each stream class. Each persistence-enabled stream uses its stream class's configured interval unless that stream has an explicit per-stream override.
+- Per-stream overrides change only the effective due interval; they do not create per-stream timers. The one global scheduler evaluates each eligible stream against its effective interval.
+- Actual interval values remain undecided.
 - This scheduler operates on Broker-owned stream state. It does not change Broker's ownership of authoritative history or the settled rule that publication acceptance does not wait for snapshot completion.
 
 ### Broker
@@ -219,7 +221,7 @@ RFC 8785 (JCS) through `github.com/gowebpki/jcs`, pinned.
 
 Broker owns every stream's authoritative message queue/log and the published messages it contains. The queue/log is the source of truth for stream ordering, fan-out, retained history, replay and message-gap calculation. Per-subscriber delivery queues are bounded delivery buffers only; they do not own or duplicate stream history.
 
-Core provides the shared in-memory snapshot and persistence model used for Broker-owned stream state. Every stream has a complete in-memory snapshot governed by its JSON Schema, regardless of whether any part is persisted. The snapshot represents the corresponding Broker-owned stream/queue state; it is not a second message store. The persistence policy selects which schema-defined properties are written to durable storage. A stream's role determines its stream class and class-level persistence policy; individual streams may override that policy. A class with no explicit persistence policy is non-persistent by default. Snapshot availability in memory is never conditional on persistence.
+Core provides the shared in-memory snapshot and persistence model used for Broker-owned stream state. Every stream has a complete in-memory snapshot governed by its JSON Schema, regardless of whether any part is persisted. The snapshot represents the corresponding Broker-owned stream/queue state; it is not a second message store. The persistence policy selects which schema-defined properties are written to durable storage. A stream's role determines its stream class and class-level persistence policy; individual streams may override that policy. A class with no explicit persistence policy is non-persistent by default. Snapshot availability in memory is never conditional on persistence. The stream-class policy also provides the snapshot interval for streams in that class; an individual stream may explicitly override that interval. Core still uses one global scheduler, which evaluates each persistence-enabled stream against its effective interval rather than creating per-stream timers.
 
 Broker remains the owner of stream identity, queues, messages, ordering, retention, subscriptions and replay. Core owns the reusable snapshot/persistence mechanism and policy. Snapshot and persistence work from Broker-owned messages and stream state; restoring persisted data restores that state to Broker before it is made available for normal publication, subscription or replay. No subsystem may create an independent queue, message history, file store or duplicate state store for data already represented by Broker streams and Core snapshots.
 
@@ -781,10 +783,10 @@ The user approved one global periodic scheduler in Core for all streams opted in
 
 - The scheduler checks eligible streams and snapshots only streams whose persisted state has changed since their last successfully completed snapshot.
 - There are no per-stream timers and no synchronous snapshot on each publication.
-- Snapshot intervals are configurable; their values are not decided here.
+- The snapshot interval is part of each stream class's policy, with an optional per-stream override. The global scheduler evaluates each persistence-enabled stream against its effective interval; this does not create per-stream timers. Actual interval values are not decided here.
 - Core performs this shared scheduling over Broker-owned state. Broker remains authoritative, and the previously settled asynchronous publication/durability contract remains unchanged.
 
-Snapshot interval values and a bounded crash-loss window remain open decisions.
+Actual snapshot interval values and a bounded crash-loss window remain open decisions.
 
 ### Settled Broker snapshot boundary model
 
@@ -817,7 +819,7 @@ The user approved the distinction between successful in-memory publication and d
 - After abrupt process failure, messages accepted after the latest successfully completed durable snapshot may be lost.
 - On restart, Broker restores the latest successfully persisted snapshot available for each opted-in stream before normal use. Sequence continues from the last restored message under the established sequence and `runId` rules.
 - Streams without persistence opt-in and Security authentication/authorisation state remain non-persistent.
-- Snapshot interval values and a bounded crash-loss window remain open. The global scheduling, per-stream snapshot boundary and atomic-promotion models are settled separately.
+- Actual snapshot interval values and a bounded crash-loss window remain open. Stream-class interval policy with optional per-stream overrides, the global scheduling, per-stream snapshot boundary and atomic-promotion models are settled separately.
 
 ### Settled Broker delivery confirmation and resume-cursor ownership
 
@@ -898,9 +900,9 @@ Before proposing anything, read this handoff, the complete **Settled decisions**
 
 **Last completed work:** The shared Broker/Core/participant architecture was added to the mission, foundational architecture, Broker semantics introduction, Storage, Tracing, package-layout guidance, Open decisions and this handoff. Tracing was reframed as a Broker participant. Older trace-specific persistence and cursor decisions were marked for supersession/reconciliation. The Broker delivery, retention, replay, persistence and snapshot decisions listed below have also been approved and recorded. Always fetch the current `main` branch before continuing; do not rely on commit identifiers from older handoffs.
 
-**Immediate next decision — snapshot interval configuration scope (NOT YET SETTLED):** Decide whether the interval for Core's global periodic snapshot scheduler is one global setting for every persistence-enabled stream, or is configurable by stream class with optional per-stream overrides. The scheduler itself is already settled as one global scheduler: it checks all persistence-enabled streams and snapshots only streams whose persisted state has changed since their last successfully completed snapshot. This outstanding question concerns interval configuration granularity only, not scheduler count or ownership. The user has not yet approved either option. Present one recommendation with its subsystem-specific and macro-architectural implications, then ask for approval. Do not silently choose or record a default.
+**Settled decision — snapshot interval configuration policy:** The interval is part of the policy provided by each stream class. Each persistence-enabled stream uses its class's configured snapshot interval unless an explicit per-stream override is supplied. Core retains one global periodic scheduler; it evaluates each eligible stream against that stream's effective interval and snapshots only changed persisted state when due. Per-stream overrides do not create per-stream timers. Actual interval values remain a separate open decision. Do not silently choose or record a default.
 
-**Other remaining persistence decisions:** A bounded crash-loss window remains unresolved. Do not invent a numeric guarantee. Snapshot interval values are also undecided; settle configuration scope first, then discuss actual interval values separately. The snapshot boundary and atomic-promotion mechanisms are settled as described below.
+**Other remaining persistence decisions:** Actual snapshot interval values and a bounded crash-loss window remain unresolved. Do not invent a numeric crash-loss guarantee. The snapshot boundary and atomic-promotion mechanisms are settled as described below.
 
 **Resume instruction:** Continue with the immediate next decision above. Do not jump back into implementing Tracing. Keep the work architecture/design only, and make the Broker contract coherent enough that Application, Security, Tracing and Admin can all use the same publish/subscribe infrastructure without direct component calls or subsystem-owned messaging/storage infrastructure.
 
@@ -955,7 +957,7 @@ The user has approved the three-dimensional retention model and oldest-first evi
 - Each snapshot is a consistent point-in-time state of one stream, identified by its highest included Broker sequence. Messages accepted after that boundary are excluded from the snapshot in progress and remain in authoritative history for a later snapshot. Publication is not blocked.
 - Snapshot completion requires the complete captured state to be persisted. Write a new snapshot separately, validate it, then atomically promote it as latest completed snapshot; retain the previous completed snapshot until promotion succeeds. On write, validation or promotion failure, preserve the previous completed snapshot as recovery point.
 - After abrupt process failure, messages accepted after the latest successfully completed durable snapshot may be lost. A bounded crash-loss window is not yet agreed.
-- Snapshot interval configuration scope and actual interval values remain unresolved. The scheduler's global nature is settled; do not confuse it with whether its interval setting is global, per stream class or overridable per stream.
+- Snapshot interval configuration scope is settled: stream-class policy supplies the interval, with an optional per-stream override; one global scheduler evaluates each stream against its effective interval. Actual interval values remain unresolved.
 
 ### Current architectural decisions carried forward
 
@@ -965,5 +967,5 @@ The user has approved the three-dimensional retention model and oldest-first evi
 - Broker owns retention of authoritative history. Replay reads from that history; subscriber delivery buffers are bounded, temporary and independent.
 - Core provides shared snapshot and persistence mechanisms for Broker-owned state. Snapshots capture defined Broker state; persistence durably stores selected snapshot data; restoration repopulates Broker's authoritative state before normal use.
 - Core uses one global periodic scheduler for persistence-enabled streams and snapshots only changed persisted state since the last successfully completed snapshot; there are no per-stream timers or synchronous per-publication snapshots. Interval values remain configurable.
-- Snapshot interval values and a bounded crash-loss window remain open decisions. The global scheduling model, per-stream point-in-time snapshot boundary, atomic promotion, acceptance-versus-durability distinction and possible loss after the latest completed snapshot are settled.
+- Actual snapshot interval values and a bounded crash-loss window remain open decisions. The global scheduling model, per-stream point-in-time snapshot boundary, atomic promotion, acceptance-versus-durability distinction and possible loss after the latest completed snapshot are settled.
 - Work remains architecture/design only: no implementation or scaffolding. Continue editing `steering.md` on `main`, preserving previously agreed decisions.

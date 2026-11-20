@@ -80,6 +80,19 @@ This is a settled Broker ownership decision:
 - There is one authoritative history per stream, shared as the source for all authorised subscribers; there are no subscriber-specific retained histories or subsystem-owned copies.
 
 
+#### Relationship between authoritative history, snapshots and persistence
+
+This is a settled architectural relationship:
+
+- Broker remains the owner of each stream's authoritative message history, including accepted messages and their ordering.
+- Core provides the shared snapshot and persistence mechanisms and policies. These mechanisms operate on Broker-owned stream and message state; they do not own a separate message history or create a second source of truth.
+- A snapshot captures a defined state of Broker-owned stream history at a particular boundary or point. It is a representation of Broker state, not another independently managed queue or message store.
+- Persistence durably stores only the snapshot data selected by the applicable stream-class persistence policy and any explicit per-stream override.
+- On restoration, persisted stream data is restored into Broker's authoritative stream state before that state is made available for normal publication, subscription or replay.
+- Subscriber delivery buffers are temporary delivery state. They are not authoritative history and are not the source from which stream snapshots or persistence are produced.
+- This decision establishes ownership and the relationship between the mechanisms. It does not yet define snapshot frequency, persistence timing, exact snapshot boundaries, crash-loss windows or detailed crash-recovery guarantees; those remain separate decisions.
+
+
 Internal and external messaging use the same Broker stream model and core messaging semantics. External access is an exposure and authorisation boundary, not a separate messaging architecture. Transport adapters may differ, but they must not create parallel stream, queue, subscription or persistence models.
 
 ### Messaging participants

@@ -15,7 +15,7 @@ This file is self-contained. It does not depend on any other repo or steering fi
 
 ## Mission
 
-Build one general-purpose message bus in Go: publishers, subscribers and a broker queue that serves them. Each stream is identified by the hash of a JSON Schema. The whole public surface is generated from a single AsyncAPI document. Applications that need messaging use this bus instead of building their own.
+Build one general-purpose, stream-based messaging infrastructure in Go. A single Broker owns streams, their message queues, publishing, subscriptions, fan-out delivery, retention, replay and message lifecycle. Application, Security, Tracing and Admin are independent messaging participants: each publishes to and subscribes to the streams required by its responsibilities. Components communicate with one another through Broker streams; there is no direct component-to-component messaging or RPC layer. Application is the client-facing participant; Security and Admin are internally provisioned; Tracing participates internally and also supports its documented external access/integration surface. Core supplies shared foundational and snapshot/persistence capabilities applied to Broker-owned stream state. Each stream is identified by the hash of a JSON Schema. The whole public surface is generated from a single AsyncAPI document. Applications that need messaging use this bus instead of building their own.
 
 The bus runs only on the user's own machine. It is never exposed to the internet and never uses a cloud service.
 
@@ -38,6 +38,56 @@ Any unresolved decision that changes scope, externally visible behaviour or an a
 If two of these disagree, the higher one wins and the lower one is fixed.
 
 ## Decisions
+
+## Foundational architecture: Core, Broker, streams and participants
+
+This is the governing architecture for every subsystem. Subsystem-specific descriptions, package boundaries, examples and API decisions must conform to it. Do not create a second communication or storage architecture for an individual subsystem.
+
+### Core
+
+Core provides foundational capabilities shared across the system, including lifecycle and shutdown coordination, shared execution context, configuration, resource ownership, and reusable snapshot/persistence policy and mechanisms. Core is not a second message bus and does not own a parallel copy of Broker messages.
+
+Core's snapshot and persistence facilities operate on state owned by the relevant subsystem. For stream message state, Broker is the authoritative owner of the stream, queue and published messages; Core supplies the shared snapshot/persistence capability and policy applied to that Broker-owned state. There must not be duplicate queue histories, per-subscriber message stores, or subsystem-specific persistence stores for data already owned by Broker.
+
+### Broker
+
+Broker is the one shared messaging and stream infrastructure. It owns registered streams and their authoritative message queues/logs, accepts publications, manages subscriptions, performs fan-out routing and dispatch, enforces delivery/backpressure rules, and owns message ordering, retention, replay and stream lifecycle. Broker also owns the message data from which stream snapshots and durable persistence are produced. Snapshotting and persistence must not introduce a second authoritative message store.
+
+A stream is the communication boundary. Components publish messages to streams and subscribe to streams. A publisher does not need to know which components subscribe; a subscriber does not need to know which component published. One stream may have many publishers and many subscribers. Fan-out semantics mean each authorised subscriber receives its own delivery of each message; this is not competing-consumer work-queue semantics.
+
+Internal and external messaging use the same Broker stream model and core messaging semantics. External access is an exposure and authorisation boundary, not a separate messaging architecture. Transport adapters may differ, but they must not create parallel stream, queue, subscription or persistence models.
+
+### Messaging participants
+
+Application, Security, Tracing and Admin are independent participants in the same infrastructure. Each may publish and subscribe, subject to its role, identity, scope and authorised stream relationships. Their responsibilities differ; their messaging infrastructure does not.
+
+- **Application:** the client-facing/external application participant. External clients use the documented Application-facing API and its approval and stream-scope rules. Application may publish to and subscribe to streams required by its application responsibilities.
+- **Security:** an internally provisioned participant. It publishes security and authorisation outcomes and subscribes to streams carrying requests and events it must evaluate. Its policy decisions remain Security-owned; Broker transports the messages but does not make those decisions.
+- **Tracing:** an internal participant that subscribes to relevant source streams and publishes tracing/observability events to appropriate stream(s). Its external trace access or integration surface consumes the same Broker-owned stream data under the documented authentication and authorisation rules. Tracing does not own a parallel message history, queue or persistence engine.
+- **Admin:** an internally authenticated administrative participant. It publishes administrative instructions/events and subscribes to streams needed for administration and observation. Its global administrative authority comes from its trusted identity and role, not from a separate messaging path.
+
+These are role and responsibility distinctions, not separate broker implementations. A participant may both publish and subscribe. Exact stream permissions remain governed by authenticated identity, role and scope.
+
+### Communication rule: no direct component-to-component calls
+
+Application, Security, Tracing, Admin and other domain components must not communicate by directly calling one another's methods, RPC endpoints, private channels or bespoke integration interfaces when exchanging domain messages or requesting domain action. They communicate by publishing to and subscribing from Broker streams. The receiving component interprets and processes the message according to its own responsibility and may publish a resulting message to another stream.
+
+A publisher must not depend on knowing its subscribers. A subscriber must not depend on knowing the publisher's implementation. Broker owns delivery; domain components own message meaning and processing. Ordinary constructor dependency injection and calls to shared Core infrastructure are not domain messaging and remain valid.
+
+Do not add a generic component-to-component messaging abstraction. Request/decision workflows, including Security authorisation, are logical messages carried on streams and use ordinary Broker publishing and subscription. HTTP/SSE is the documented external transport/API surface; it does not create a private direct-call channel between internal components.
+
+### Streams, queues, snapshots and persistence
+
+A stream is a schema-identified, ordered message history managed by Broker. Its queue/log is the authoritative in-memory collection of published messages and the source for fan-out, replay, retention and gap reporting. Per-subscriber delivery queues are bounded delivery buffers; they are not independent stream histories and do not own the published messages.
+
+Core's shared snapshot/persistence facilities operate on Broker-owned stream and message state. A snapshot captures a defined Broker stream/queue state or checkpoint; persistence retains configured Broker-owned message data according to the stream-class policy and any explicit per-stream override. Restoring persisted data repopulates Broker's authoritative stream state before that state is served. Do not create a separate stream store in Tracing, Security, Admin or Application.
+
+The exact durability guarantees, snapshot boundary, persistence ordering, crash-loss window, restoration validation and reconciliation must follow decisions recorded in the relevant sections below. This architecture statement does not silently change already-settled retention, authentication-state, Security recovery or trace-event contract decisions.
+
+### Architectural review rule
+
+Whenever a subsystem proposal introduces a queue, event bus, stream, history, snapshot, persistence worker, replay mechanism, subscription registry or component integration, first determine whether Broker or Core already owns that capability. Reuse the shared capability where semantics match. If a subsystem genuinely needs additional domain state, distinguish that state from Broker-owned messages and justify why it cannot be represented in its own stream. Never duplicate infrastructure merely to simplify one subsystem locally.
+
 
 ### Deployment
 
@@ -84,13 +134,15 @@ RFC 8785 (JCS) through `github.com/gowebpki/jcs`, pinned.
 
 ### Storage
 
-Core owns one shared in-memory snapshot model for pub/sub stream state. Every stream has a complete in-memory snapshot governed by its JSON schema, regardless of whether any part is persisted. The persistence policy selects which schema-defined properties are written to durable storage. A stream's role determines its stream class and class-level persistence policy; individual streams may override that policy. A class with no explicit persistence policy is non-persistent by default. Snapshot availability in memory is never conditional on persistence.
+Broker owns every stream's authoritative message queue/log and the published messages it contains. The queue/log is the source of truth for stream ordering, fan-out, retained history, replay and message-gap calculation. Per-subscriber delivery queues are bounded delivery buffers only; they do not own or duplicate stream history.
 
-Pub/sub subsystems do not create independent files, memory stores or duplicate state stores for data already represented by shared Core snapshots. They publish and consume state through the ordinary pub/sub stream and its JSON schema. Tracing, Security and other subscribers use the shared Core snapshot/persistence mechanism rather than owning parallel storage architectures. Any genuinely transient process-local state that is not part of a stream snapshot must be explicitly distinguished; it must not silently become a second store for stream state.
+Core provides the shared in-memory snapshot and persistence model used for Broker-owned stream state. Every stream has a complete in-memory snapshot governed by its JSON Schema, regardless of whether any part is persisted. The snapshot represents the corresponding Broker-owned stream/queue state; it is not a second message store. The persistence policy selects which schema-defined properties are written to durable storage. A stream's role determines its stream class and class-level persistence policy; individual streams may override that policy. A class with no explicit persistence policy is non-persistent by default. Snapshot availability in memory is never conditional on persistence.
 
-Security state, including subscriber identities, roles, credential hashes, pending approvals and authorisation state, is represented in the shared in-memory snapshot model according to its schema. Security snapshots are not persisted; sensitive and transient Security properties are excluded from durable storage by policy. Plaintext bearer credentials are not retained in snapshots; credential hashes are held where required for verification. This does not change the existing authentication/authorisation lifecycle or bootstrap rules.
+Broker remains the owner of stream identity, queues, messages, ordering, retention, subscriptions and replay. Core owns the reusable snapshot/persistence mechanism and policy. Snapshot and persistence work from Broker-owned messages and stream state; restoring persisted data restores that state to Broker before it is made available for normal publication, subscription or replay. No subsystem may create an independent queue, message history, file store or duplicate state store for data already represented by Broker streams and Core snapshots.
 
-In-memory snapshots are lost when the process exits. Only schema properties selected by an explicit persistence policy may be restored after restart. Authentication and authorisation state remains non-persistent.
+Application, System, Security and Admin stream state follows the shared Core snapshot/persistence policy. This does not make all control-plane or authentication state durable. Security state, including subscriber identities, roles, credential hashes, pending approvals and authorisation state, is represented in the shared in-memory snapshot model according to its schema. Security snapshots are not persisted; sensitive and transient Security properties are excluded from durable storage by policy. Plaintext bearer credentials are not retained in snapshots; credential hashes are held where required for verification. This does not change the existing authentication/authorisation lifecycle or bootstrap rules.
+
+In-memory snapshots are lost when the process exits. Only schema properties selected by an explicit persistence policy may be restored after restart. Authentication and authorisation state remains non-persistent. Persistence and snapshots must not create a second authoritative message history beside Broker's queue/log.
 
 ### Docs UI
 
@@ -98,7 +150,13 @@ Served at `/`, with a "Try it" console generated from the contract.
 
 ### Tracing
 
-Tracing is a normal System-role pub/sub subscriber. It observes stream activity through the ordinary stream and JSON-schema contract and uses the shared Core in-memory snapshots. Tracing does not own a separate per-stream history store or an independent persistence subsystem. Its snapshot is always maintained in memory like every other stream snapshot. Any durable trace data is governed by the same schema-property persistence policy as other streams; there is no special Tracing file store, writer, rotation or restore path. The `/streams` HTML viewer and trace SSE API consume the shared Core stream/snapshot interfaces.
+Tracing is a normal internally provisioned System-role messaging participant. It subscribes to relevant Broker streams to observe message and subsystem activity, and publishes trace/observability events to the appropriate tracing stream(s). It uses the same Broker publish, subscribe, queue, delivery, retention, replay, snapshot and persistence infrastructure as every other participant. Internal status grants no separate messaging path, unlimited queue, direct-call access or persistence privilege.
+
+Broker owns tracing-stream messages and their retained history just as it owns messages on every other stream. Core's shared snapshot/persistence mechanism applies to tracing streams according to their stream class and explicit persistence policy. Tracing does not own a separate per-stream message-history store, queue, snapshot store, persistence engine, file writer, rotation mechanism or restore path. Trace history, replay and gaps are derived from Broker-owned stream messages and the standard Broker semantics.
+
+Tracing is observational: it must not become part of the business or Security decision path, block publishers or deliveries, or recursively instrument its own trace publication without an explicit recursion-prevention rule. Trace records must not contain message payloads or bearer credentials. Tracing subscribes through ordinary authenticated subscriptions and is subject to the same bounded queues, detachment and gap behaviour as other participants; its response to a gap follows its observational correctness requirements.
+
+The existing TraceEvent contract fields and event-kind definitions below remain domain-level tracing content, subject to the Broker stream envelope and ordering contract. Any separate traceSeq, trace-specific cursor or trace-specific gap representation must not create a second queue or replay system; its relationship to Broker's stream seq, Last-Event-ID, stream.gap and retention rules must be made consistent in the contract before implementation. The trace API and /streams viewer consume Broker-owned tracing-stream data rather than an independent recorder or file-tail source.
 
 ### Monitor UI
 
@@ -532,6 +590,9 @@ A field is never renamed between publish and subscribe (for example `eventType` 
 
 ## Broker semantics
 
+Broker is the only messaging infrastructure. All domain communication uses Broker streams. Application, Security, Tracing, Admin and future participants may publish and subscribe according to their authenticated role and stream scope. No direct component-to-component calls, RPC, private event channels or subsystem-owned message queues are introduced for domain communication. Broker owns authoritative stream queues/logs and published messages, ordering, fan-out, routing, dispatch, subscriptions, delivery, retention and replay. Core supplies shared snapshot/persistence facilities applied to that state. The detailed rules below govern common stream semantics for every participant unless an explicitly agreed domain-specific correctness rule defines how that participant responds to a standard delivery outcome.
+
+
 ### Ordering and identity
 
 - The process creates one unique `runId` at startup.
@@ -925,7 +986,8 @@ internal/streamid/                 schema admission, JCS, hashing
 internal/broker/                   streams, seq, retention, replay, subscriber queues
 internal/service/                  implements api.Handler using broker and streamid
 internal/auth/                     internal authentication subscriber, in-memory pending approvals and subscriber–stream sessions, administrator-token validation, credentials, authorisation and revocation
-internal/trace/                    per-stream in-memory recorder, trace counter and persistence worker
+internal/core/                     shared lifecycle, execution context, configuration, snapshot and persistence capabilities
+internal/trace/                    Tracing messaging participant and trace-event interpretation; no independent stream queue, message history or persistence store
 internal/web/                      docs page (/), stream monitor page (/streams), authentication administration page, vendored assets
 internal/integration/              HTTP/SSE contract tests
 internal/testsupport/              shared SSE test client and contract assertions
@@ -1267,6 +1329,17 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 
 ## Open decisions
 
+### Settled foundational architecture — Broker streams are the only component communication model
+
+The user has clarified and settled the macro-architecture: Application, Security, Tracing and Admin are independent participants in one shared Broker infrastructure. Each can publish to and subscribe to streams according to its responsibility, authenticated identity, role and scope. They are not merely subscribers; each may be both publisher and subscriber. Components communicate with one another through Broker streams, not direct method calls, RPC, private channels or a separate component-to-component abstraction. The publisher does not need to know its subscribers, and subscribers do not need to know publisher implementations. Broker owns streams, authoritative message queues/logs, published messages, ordering, fan-out, routing, dispatch, subscriptions, delivery, retention and replay. Per-subscriber queues are bounded delivery buffers, not separate message histories.
+
+Application is the client-facing/external application participant. Security and Admin are internally provisioned participants. Tracing participates internally and also has an external trace access/integration surface; both use the same Broker-owned stream data and existing authentication/authorisation model. Each participant's behaviour differs by domain responsibility, not by using separate messaging infrastructure.
+
+The user has also clarified the relationship between Broker and Core: Broker owns its queues and published messages. Stream snapshots and persistence operate on that Broker-owned stream/queue/message state; Core provides the shared reusable snapshot/persistence mechanism and policy. There must be no duplicate authoritative stream store and no subsystem-specific queue/history/persistence implementation for messages already owned by Broker. Persistence restoration restores Broker-owned stream state before it is used. Existing stream fan-out semantics remain in force: every authorised subscriber receives its own delivery; this is not competing-consumer work-queue semantics.
+
+This decision supersedes any description of direct component-to-component messaging, independent subsystem message buses, Tracing-owned stream history/queues, or Tracing-owned message persistence. Preserve domain-specific trace event schemas, authentication rules, delivery guarantees and correctness-specific gap handling, but express them through the common Broker stream model. Any remaining conflict between the new ownership model and older trace-specific cursor, sequence, file, snapshot or replay rules must be reconciled before implementation; do not silently preserve a second source of truth or invent a mapping.
+
+
 The former “Internal subscribers and the Security role” discussion has been reconciled with the authoritative settled decisions below. Internal subscriber identity and provisioning, the existing Security authorisation request/decision contracts and validation, delivery and failure behaviour, timeout handling, tombstone retention, and recovery are settled; they are not open design topics.
 
 The universal HTTP rate-limiting requirement, token-bucket mechanism, four endpoint categories and their default refill rates and bucket capacities are settled: public read/discovery 120 requests/minute with capacity 30; write/mutation 60 requests/minute with capacity 15; SSE establishment 60 requests/minute with capacity 10; and administration 30 requests/minute with capacity 10. Each category remains independently configurable; new endpoints use an existing category unless an explicit decision adds another. Identity/IP accounting, bounded bursts, standard `429` responses and trusted-proxy-only forwarded IP handling are also settled. No further rate-limit default decision is open. HTTP request rate limiting is independent of the already-settled SSE concurrent-connection limit. The trace-retention scope is settled: each stream has one shared retained trace history visible to every authorised subscriber; subscriber-specific trace retention is not used. The trace-cursor-below-retained-history behaviour described in Settled decisions was explicitly agreed and is no longer an open topic.
@@ -1278,6 +1351,8 @@ The central-Core stream persistence direction and its foundational scope are set
 Any newly identified decision that changes scope, externally visible behaviour or an acceptance criterion must be discussed and explicitly agreed before it is added to **Settled decisions**. Do not infer or silently settle decisions.
 
 ## Next-session handoff
+
+**Latest architectural decision:** Application, Security, Tracing and Admin all participate in one shared Broker infrastructure and may both publish and subscribe to streams. Component-to-component communication is exclusively through Broker streams; there is no direct-call/RPC/private-channel messaging architecture. Application is the client-facing/external participant; Security and Admin are internally provisioned; Tracing participates internally and also has an external trace access/integration surface. Broker owns streams, authoritative queues/logs and published messages, ordering, fan-out, routing, dispatch, subscriptions, delivery, retention and replay. Core supplies shared snapshot/persistence capabilities and policy operating on Broker-owned stream state; no duplicate subsystem message stores are allowed. Reconcile older Tracing-specific history, queue, snapshot, persistence, cursor and replay rules with this ownership model before implementation, preserving domain-specific trace contracts and correctness rules where compatible.
 
 **Resume from the latest `main` branch of this file.** Before proposing anything, read this handoff, the complete **Settled decisions** section, and the **Open decisions** section. Continue architecture discussion only: do not implement, scaffold, or create code. Discuss exactly one architectural decision at a time. For each proposal, explain both subsystem-specific behaviour and macro-architectural implications. A proposal explicitly marked NOT settled must remain unsettled until the user agrees. After each agreement, update this file directly on `main`, preserve all prior decisions, and verify the committed content by fetching it again.
 

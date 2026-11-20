@@ -730,6 +730,21 @@ Where byte-for-byte reproducibility is not achievable because of platform packag
 
 ## Open decisions
 
+### Settled Broker retention model and eviction ordering
+
+The user has approved a three-dimensional retention policy for each Broker-owned authoritative stream history:
+
+- Retention has three independent, cumulative hard limits: maximum age, maximum retained message count and maximum retained storage size.
+- Retention limits are configured by stream class, with optional per-stream overrides.
+- Maximum age is measured from Broker acceptance time, not replay or delivery time. Messages older than the configured maximum age are eligible for eviction.
+- If the retained message count or retained storage size exceeds its configured limit, Broker evicts the oldest retained messages first.
+- When one or more limits are exceeded, Broker continues oldest-first eviction until all configured limits are satisfied. Meeting one limit does not exempt retained messages from either of the other limits.
+- These limits apply to Broker's authoritative stream history, not to per-subscriber delivery buffers.
+- The illustrative values 7 days, 100,000 messages and 500 MB are not approved defaults.
+
+The model and oldest-first ordering are settled. The precise enforcement schedule (immediate versus periodic), the storage-size accounting definition, individual-message maximum, and replay/gap behaviour at eviction boundaries remain open and must be decided separately.
+
+
 ### Settled foundational architecture — Broker streams are the only component communication model
 
 The user has clarified and settled the macro-architecture: Application, Security, Tracing and Admin are independent participants in one shared Broker infrastructure. Each can publish to and subscribe to streams according to its responsibility, authenticated identity, role and scope. They are not merely subscribers; each may be both publisher and subscriber. Components communicate with one another through Broker streams, not direct method calls, RPC, private channels or a separate component-to-component abstraction. The publisher does not need to know its subscribers, and subscribers do not need to know publisher implementations. Broker owns streams, authoritative message queues/logs, published messages, ordering, fan-out, routing, dispatch, subscriptions, delivery, retention and replay. Per-subscriber queues are bounded delivery buffers, not separate message histories.
@@ -786,16 +801,17 @@ Before proposing anything, read this handoff, the complete **Settled decisions**
 
 ## Session handoff — Broker retention limits
 
-Current discussion is at the Broker retention-policy decision. The following is a proposal only and has **not** been approved:
+The user has approved the three-dimensional retention model and oldest-first eviction ordering. The settled rules are recorded under **Settled Broker retention model and eviction ordering** in Open decisions:
 
-- Configure retention using all three dimensions: maximum age, maximum message count and maximum storage size.
-- Enforce these limits against the Broker-owned authoritative stream history, not subscriber delivery buffers.
-- Configure defaults by stream class, with optional per-stream overrides.
-- When a limit is exceeded, remove the oldest eligible retained messages until the configured limits are satisfied.
+- Maximum age, maximum retained message count and maximum retained storage size are independent, cumulative hard limits.
+- Limits are configured by stream class, with optional per-stream overrides.
+- Age is measured from Broker acceptance time.
+- Expired messages are eligible for eviction; count or storage-size excess triggers oldest-first eviction.
+- When any limit is exceeded, evict oldest retained messages until all configured limits are satisfied.
+- Enforcement applies to Broker's authoritative stream history, never subscriber delivery buffers.
+- The illustrative values 7 days, 100,000 messages and 500 MB are not approved defaults.
 
-Example values discussed for illustration only (not approved defaults): 7 days, 100,000 messages and 500 MB.
-
-**Next action:** ask the user whether they agree with the three-dimensional retention model. If approved, record it as settled; then decide the precise eviction semantics, including how age/count/size limits interact, whether deletion is immediate or periodic, and how replay reports messages that are no longer retained.
+**Next decision:** determine the enforcement schedule (immediate versus periodic), then separately settle storage-size accounting, individual-message maximum and replay/gap behaviour at eviction boundaries. Do not treat any of these remaining details as settled.
 
 ### Current architectural decisions carried forward
 

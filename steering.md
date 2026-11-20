@@ -698,9 +698,9 @@ When the limit is reached, the oldest file is deleted.
 
 Trace files survive a process restart even though in-memory streams and messages do not.
 
-When a schema is registered again, its recorder scans the retained trace files and continues `traceSeq` after the highest retained value.
+When a schema is registered again after restart, the service restores retained history from persistence before normal trace replay begins, subject to the still-open validation and reconciliation policy. If restoration succeeds, the in-memory recorder continues sequence assignment from the restored history; exact failure and continuity behaviour remain open.
 
-When a recorder scans retained trace files on stream registration, it validates every retained file and every JSON Lines record needed to establish the trace history. If any retained file is unreadable or contains a malformed record, the recorder must not skip the file, truncate it, overwrite it or guess the next `traceSeq`. File tracing for that stream is disabled for the remainder of the process; no new events are appended for that stream. `/health` reports the affected stream and degraded trace status. Retained files are left untouched for operator inspection or repair. Other streams and the bus continue normally.
+Persistence restoration must validate the retained files and records before admitting their contents into in-memory history or establishing sequence continuity. The exact malformed-record, unreadable-file, reconciliation and recovery policy remains open; no skip, truncation, overwrite, repair or sequence-guessing behaviour is implied. A restoration failure degrades restart durability for that stream but does not disable live in-memory tracing.
 
 The files are written only to local disk.
 
@@ -742,7 +742,7 @@ Its payload schema and event name are still part of `api/asyncapi.yaml` and are 
 
 `fromTraceSeq` and `toTraceSeq` are inclusive missing sequence bounds.
 
-The trace SSE operation (`GET /v1/streams/{streamId}/trace`) tails the active and rotated files directly; there is no separate in-memory trace log.
+The trace SSE operation (`GET /v1/streams/{streamId}/trace`) reads and subscribes to the per-stream in-memory trace history. It never tails or reads the active or rotated persistence files; those files are used only for restart restoration.
 
 Its resume cursor is `traceSeq`, supplied exclusively through the `Last-Event-ID` HTTP header.
 
@@ -752,13 +752,13 @@ If `Last-Event-ID` is present but cannot be parsed as a valid trace sequence cur
 
 The server locates the first retained event after that cursor. If the cursor is higher than the newest retained `traceSeq`, it treats the cursor as a valid resume position and waits for future events with higher `traceSeq` values; it does not reject the cursor or emit a `trace.gap` because no missing range has been established.
 
-If rotation has removed events after the cursor, it first sends a `trace.gap` SSE event with `{ fromTraceSeq, toTraceSeq }`, where the range identifies the missing trace sequence numbers, then continues with retained events.
+If in-memory retention has evicted events after the cursor, it first sends a `trace.gap` SSE event with `{ fromTraceSeq, toTraceSeq }`, where the range identifies the missing trace sequence numbers, then continues with the retained in-memory events. Persistence-file rotation is not consulted by live replay or gap calculation.
 
-The SSE `id` on each persisted trace event is its `traceSeq`.
+The SSE `id` on each delivered trace event is its `traceSeq`, regardless of whether the event was originally restored from persistence or recorded during the current process run.
 
 The `trace.gap` event uses `toTraceSeq` as its SSE `id`, so a reconnect after the gap does not report the same missing range again.
 
-The trace SSE operation uses `traceSeq` as its SSE `id`. Cursor continuity across process restarts is preserved when retained trace files preserve the prior sequence history; if all trace files are absent and a new history starts at 1, a cursor from the previous history may be ahead of the new history and follows the future-cursor rule above.
+The trace SSE operation uses `traceSeq` as its SSE `id`. Cursor continuity across process restarts depends on successful restoration of the prior retained sequence history. If no prior history can be restored and a new history starts at 1, a cursor from the previous history may be ahead of the new history and follows the future-cursor rule above; restoration and reconciliation details remain open.
 
 Each persisted `TraceEvent` carries `runId`, so consumers can identify which process run produced it.
 
@@ -766,7 +766,7 @@ The trace is not itself a bus stream. This avoids recursion where tracing a deli
 
 ### Package
 
-`internal/trace` owns the per-stream counter and the file writer.
+`internal/trace` owns the per-stream in-memory recorder, trace sequence counter and asynchronous persistence worker.
 
 The broker and the service receive a `*trace.Recorder` through their constructors.
 
@@ -804,8 +804,8 @@ Selecting a card opens only that stream's trace from `GET /v1/streams/{streamId}
 - Filters by event kind and subscription. When a subscription filter is active, the page shows events belonging to that subscription and retains the corresponding `publish.accepted` events as context when they share the same `runId` and message `seq` with a visible `delivery`. It hides unrelated publishes and deliveries from other subscriptions. Filtering changes presentation only; it does not change trace records or their `traceSeq` order.
 - Pause closes the selected stream's trace SSE connection and retains the most recently received SSE event ID as the resume cursor. For persisted trace events this is their `traceSeq`; for a `trace.gap` control event it is the event's `toTraceSeq` ID.
 - Resume opens a new trace SSE connection for the selected stream using the retained cursor in the standard `Last-Event-ID` HTTP header.
-- Events still present in retained trace files after the cursor are replayed.
-- Events removed by rotation after the cursor are reported through `trace.gap`, after which replay continues with retained events.
+- Events still present in the retained in-memory trace history after the cursor are replayed.
+- Events evicted from the in-memory trace history after the cursor are reported through `trace.gap`, after which replay continues with retained events.
 - Jump to `traceSeq`.
 
 The page must not imply that events removed by rotation can be recovered.

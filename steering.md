@@ -1284,7 +1284,7 @@ Any newly identified decision that changes scope, externally visible behaviour o
 
 **Next session's first task:** Read the latest `main` version of this file, including this handoff, **Open decisions**, and the complete **Settled decisions** section. Continue the full-document consistency review one issue at a time, distinguishing contradictions from underspecified behaviour and editorial cleanup. The monitor-page Pause/resume decision is settled; preserve its agreed semantics. Preserve every other settled decision. Architecture/design discussion only; no implementation, scaffolding or code changes without explicit authorisation.
 
-**Latest verified review commit:** To be updated after the next agreed review change is committed and verified.
+**Latest verified review commit:** `0e9b86f6a73af53ba122d7d98499bf436c4894cb` (`Settle stream monitor trace pause and resume semantics`).
 
 No implementation or scaffolding is authorised.
 ## Settled decisions

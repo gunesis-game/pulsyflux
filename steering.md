@@ -614,6 +614,8 @@ The bus records what happens to publishes and subscriptions, in the exact order 
 
 Each stream has its own trace, written to a local JSON Lines file and served through the trace SSE operation.
 
+Trace retention is shared across all authorised subscribers to a stream. There is one retained history per stream, governed by that stream's `trace.maxFileBytes` and `trace.maxFiles` settings. Every authorised subscriber replays from the same retained history and observes the same rotation, eviction and `trace.gap` boundaries; no subscriber-specific retention window exists.
+
 ### Trace events
 
 `TraceEvent` is a contract schema in `api/asyncapi.yaml`, so its Go type is generated like every other wire type.

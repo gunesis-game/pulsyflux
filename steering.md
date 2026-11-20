@@ -476,7 +476,7 @@ Returns every registered stream with:
 
 `GET /v1/streams/{streamId}/trace`
 
-SSE of trace events for one stream, in trace order.
+SSE of trace events for one stream, in trace order. The endpoint is publicly reachable as an API interface, but trace data is not anonymously accessible. An external client establishes the SSE connection and enters the ordinary external `Application` subscriber authorisation workflow for its exact Subscriber ID + Stream ID relationship. The core holds the connection pending while the request is processed through the standard Security pub/sub authorisation workflow and emits no trace records unless access is approved. The same credential verification, authorisation timeout, denial, revocation and connection rules that apply to an ordinary external subscription apply here; this endpoint introduces no separate authentication or authorisation path. The internal Tracing `System` subscriber also uses the standard Security workflow and receives no exemption.
 
 Resume exclusively with `Last-Event-ID` (a `traceSeq`).
 
@@ -784,7 +784,7 @@ It is a concrete type with no interface, because there is only one implementatio
 
 ## Stream monitor page
 
-`/streams` serves an optional HTML trace viewer for PulsyFlux users who do not want to build their own monitoring interface. The page lists every stream and lets the user select one stream to view its live trace in chronological order. It is a browser client of the public `GET /v1/streams/{streamId}/trace` SSE operation; that operation remains the sole trace-data interface and source of truth. External clients may consume the same public API directly and are not required to use this page.
+`/streams` serves an optional HTML trace viewer for PulsyFlux users who do not want to build their own monitoring interface. The page lists every stream and lets the user select one stream to view its live trace in chronological order. It is a browser client of the publicly reachable `GET /v1/streams/{streamId}/trace` SSE operation; that operation remains the sole trace-data interface and source of truth. External clients may consume the same API directly and are not required to use this page, but they must establish an SSE connection and obtain access through the ordinary external `Application` subscriber authorisation workflow for the exact Subscriber ID + Stream ID relationship. The connection remains pending and no trace records are delivered until the standard Security pub/sub workflow approves access; the endpoint is not anonymous.
 
 ### Behaviour
 
